@@ -1,0 +1,47 @@
+
+########## [configure] 1/6 pin PonWrt ref (master) ##########
+f6977f2 ci: show the tag in release workflow runs
+
+########## [configure] 2/6 patch kernel config (honk eBPF: BTF/cgroup/TC-bpf/ftrace) ##########
+[kernel] patched target/linux/airoha/an7581/config-6.18
+
+########## [configure] 3/6 append feeds (honk/fttr/PR16) ##########
+[feeds] openwrt-fttr + luci-app-fttr (fork;package) enabled
+[feeds] pon_userspace -> DenzelVincent fork (PR#16 head)
+[feeds] feeds.conf.default:
+src-git packages https://github.com/immortalwrt/packages.git
+src-git luci https://github.com/immortalwrt/luci.git
+src-git routing https://github.com/openwrt/routing.git
+src-git telephony https://github.com/openwrt/telephony.git
+src-git video https://github.com/openwrt/video.git
+src-git pon_drivers https://github.com/pbs05/openwrt-pon-drivers.git
+src-git pon_userspace https://github.com/DenzelVincent/openwrt-pon-userspace.git;main
+src-git openwrt-honk https://github.com/kenzok8/openwrt-honk.git
+src-git openwrt-fttr https://github.com/LazuliKao/openwrt-fttr.git
+src-git fttr-ui https://github.com/likz0421/luci-app-fttr.git;package
+
+########## [configure] 4/6 apply base config + additions ##########
+[config] .config.fttr applied
+
+# --- 芯片状态：CPU 频率/调频状态页 + 系统状态图（负载/CPU）---
+# 注：PonWrt 源里没有 luci-app-hardware；cpufreq 是芯片（SoC）状态最接近的官方页
+CONFIG_PACKAGE_luci-app-cpufreq=y
+CONFIG_PACKAGE_luci-app-statistics=y
+CONFIG_PACKAGE_collectd-mod-cpu=y
+# =============================================================
+# openFTTR OLT 栈（仅当 workflow 参数 with_fttr=true 时追加）
+# 上游：LazuliKao/openwrt-fttr（H3C HM2004-DU Micro-OLT 驱动 + fttrd 控制器）
+# =============================================================
+
+# OLT 内核驱动 + FPGA 固件
+CONFIG_PACKAGE_kmod-h3c-fmcs=y
+CONFIG_PACKAGE_h3c-fmcs-firmware=y
+
+# FTTR 用户态控制器 fttrd/fttrctl
+CONFIG_PACKAGE_openwrt-fttr=y
+
+# FTTR 前端（来自 likz0421/luci-app-fttr fork 的 package 分支）
+CONFIG_PACKAGE_luci-app-fttr=y
+
+########## [configure] 5/6 feeds update + install ##########
+Syntax error in feeds.conf.default, line 11
