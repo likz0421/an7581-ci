@@ -1,0 +1,72 @@
+# 从既有构建工件补传固件到 Release
+name: upload-firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: '工件名'
+        required: false
+        default: 'an7581-run-10'
+      tag:
+        description: 'Release 标签'
+        required: false
+        default: 'v10'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Download artifact zip via API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          trap 'echo "::error::download step failed at line $LINENO rc=$?"' ERR
+          NAME="${{ github.event.inputs.artifact_name }}"
+          echo "NAME=[$NAME]"
+          RAW=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" || echo "GH_API_FAILED")
+          ART_ID=$(echo "$RAW" | jq -r --arg n "$NAME" '.artifacts[] | select(.name==$n) | .id' | head -n1 || true)
+          echo "ART_ID=[$ART_ID]"
+          if [ -z "$ART_ID" ]; then
+            echo "::error::artifact not found; available: $(echo "$RAW" | jq -r ".artifacts[].name" 2>/dev/null | head -10)"
+            exit 1
+          fi
+          ZURL="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ART_ID/zip"
+          echo "downloading: $ZURL"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "$ZURL" -o fw.zip
+          rc=$?
+          ls -lh fw.zip
+          head -c 200 fw.zip | od -c | head -3
+          MAGIC=$(head -c 2 fw.zip | od -An -c | tr -d " ")
+          if [ "$MAGIC" != "PK" ]; then
+            echo "::error::fw.zip is not a zip (magic=$MAGIC); first bytes:"
+            head -c 500 fw.zip
+            exit 1
+          fi
+          mkdir -p fw
+          command -v unzip >/dev/null || sudo apt-get install -y unzip >/dev/null 2>&1 || true
+          if command -v unzip >/dev/null; then unzip -qq -o fw.zip -d fw; else python3 -m zipfile -e fw.zip fw/; fi
+          echo "=== .bin files ==="
+          find fw -type f -name "*.bin" | sort
+      - name: Upload .bin files to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          trap 'echo "::error::upload step failed at line $LINENO rc=$?"' ERR
+          TAG="${{ github.event.inputs.tag }}"
+          BINS=$(find fw -type f -name "*.bin" | sort)
+          if [ -z "$BINS" ]; then echo "::error::no .bin in artifact"; exit 1; fi
+          echo "uploading: $BINS"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --prerelease --title "HM2004-DU PonWrt $TAG" --notes "FW assets"
+          fi
+          gh release upload "$TAG" $BINS --clobber
+          echo "=== release assets ==="
+          gh release view "$TAG" --json assets -q ".assets[].name"

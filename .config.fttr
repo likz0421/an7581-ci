@@ -1,0 +1,14 @@
+# =============================================================
+# openFTTR OLT 栈（仅当 workflow 参数 with_fttr=true 时追加）
+# 上游：LazuliKao/openwrt-fttr（H3C HM2004-DU Micro-OLT 驱动 + fttrd 控制器）
+# =============================================================
+
+# OLT 内核驱动 + FPGA 固件
+CONFIG_PACKAGE_kmod-h3c-fmcs=y
+CONFIG_PACKAGE_h3c-fmcs-firmware=y
+
+# FTTR 用户态控制器 fttrd/fttrctl
+CONFIG_PACKAGE_openwrt-fttr=y
+
+# FTTR 前端（来自 likz0421/luci-app-fttr fork 的 package 分支）
+CONFIG_PACKAGE_luci-app-fttr=y

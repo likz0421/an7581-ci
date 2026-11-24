@@ -1,0 +1,137 @@
+# Build PonWrt (AN7581) for H3C HM2004-DU: eBPF Honk + openFTTR + chip status
+name: build-an7581
+
+on:
+  workflow_dispatch:
+    inputs:
+      ponwrt_ref:
+        description: 'PonWrt branch or commit to build (default: master)'
+        required: false
+        default: 'master'
+      with_fttr:
+        description: 'Build openwrt-fttr OLT stack + luci-app-fttr'
+        required: false
+        default: 'true'
+      pon_userspace_pr16:
+        description: 'Use pbs05/openwrt-pon-userspace PR #16 (PON 光模块状态卡片)'
+        required: false
+        default: 'true'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-an7581.yml'
+      - '.config.additions'
+      - '.config.fttr'
+      - 'scripts/configure.sh'
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+            g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
+            libglib2.0-dev libgmp-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
+            libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
+            ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+            python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+
+      - name: Clone PonWrt
+        run: |
+          git clone --depth=1 https://github.com/pbs05/ponwrt.git ponwrt
+          cd ponwrt
+          REF="${{ github.event.inputs.ponwrt_ref || 'master' }}"
+          if [ "$REF" != "master" ]; then
+            git fetch --depth=1 origin "$REF"
+            git checkout "$REF"
+          fi
+          git log -1 --oneline
+
+      - name: Configure feeds and packages
+        run: |
+          set +e
+          CI_ROOT="$GITHUB_WORKSPACE" bash "$GITHUB_WORKSPACE/scripts/configure.sh" \
+            "${{ github.event.inputs.ponwrt_ref || 'master' }}" \
+            "${{ github.event.inputs.with_fttr || 'true' }}" \
+            "${{ github.event.inputs.pon_userspace_pr16 || 'true' }}" > /tmp/configure.log 2>&1
+          rc=$?
+          echo "=== configure rc=$rc ==="
+          tail -n 200 /tmp/configure.log
+          if [ $rc -ne 0 ]; then
+            # publish the tail through a check-run annotation (readable even when Actions logs are blocked)
+            tail -n 80 /tmp/configure.log | sed 's/::/:/g' | tr '\n' '|' | cut -c1-6000 > /tmp/configure-err.txt
+            echo "::error::configure failed (rc=$rc): $(cat /tmp/configure-err.txt)"
+            cd "$GITHUB_WORKSPACE"
+            git config user.name "an7581-ci-diagnostics"
+            git config user.email "ci@users.noreply.github.com"
+            mkdir -p diagnostics
+            cp /tmp/configure.log "diagnostics/configure-run-${{ github.run_number }}.log"
+            git add diagnostics
+            git commit -m "diagnostics: configure failure run ${{ github.run_number }}" || true
+            push_out=$(git push origin HEAD:main 2>&1) || true
+            echo "::warning::diagnostics push: $(echo "$push_out" | tr '\n' ' ' | cut -c1-400)"
+            exit 1
+          fi
+          exit 0
+
+      - name: Build
+        run: |
+          set +e
+          ( cd ponwrt && make -j"$(nproc)" ) > /tmp/build.log 2>&1
+          rc=$?
+          echo "=== build rc=$rc ==="
+          tail -n 120 /tmp/build.log
+          if [ $rc -ne 0 ]; then
+            tail -n 60 /tmp/build.log | sed 's/::/:/g' | tr '\n' '|' | cut -c1-6000 > /tmp/build-err.txt
+            echo "::error::build failed (rc=$rc): $(cat /tmp/build-err.txt)"
+            cd "$GITHUB_WORKSPACE"
+            git config user.name "an7581-ci-diagnostics"
+            git config user.email "ci@users.noreply.github.com"
+            mkdir -p diagnostics
+            tail -n 4000 /tmp/build.log > "diagnostics/build-run-${{ github.run_number }}.log"
+            git add diagnostics
+            git commit -m "diagnostics: build failure run ${{ github.run_number }}" || true
+            push_out=$(git push origin HEAD:main 2>&1) || true
+            echo "::warning::diagnostics push: $(echo "$push_out" | tr '\n' ' ' | cut -c1-400)"
+            exit 1
+          fi
+          exit 0
+
+      - name: Upload images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: an7581-run-${{ github.run_number }}
+          path: ponwrt/bin/targets/airoha/an7581/
+          retention-days: 30
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: HM2004-DU PonWrt #${{ github.run_number }}
+          body: |
+            **设备**: H3C HM2004-DU (Airoha AN7581CT)
+            **内核**: 6.18 (PonWrt master)
+            **内置插件**: eBPF Honk · Airoha NPU 状态监控 · openFTTR · PON 光模块卡片 (PR #16)
+            **Passwall**: 已关闭
+            ---
+            刷机说明见 [README](https://github.com/${{ github.repository }}/blob/main/README.md)
+          files: ponwrt/bin/targets/airoha/an7581/**/*.bin
+          draft: false
+          prerelease: true
