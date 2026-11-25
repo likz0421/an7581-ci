@@ -93,8 +93,10 @@ scp online-fix/frontend/topology.js root@10.1.1.1:/www/luci-static/resources/vie
 ## 升级方式 B：后端 apk（修复 bug #1、#3，可选）
 
 后端 fttrd 是编译后的二进制，需升级 apk。GitHub Actions workflow `build-fttr-packages`
-（run id `45612411796`）正在编译。完成后从该 run 的 artifact `fttr-packages` 下载
-`openwrt-fttr-*.apk`，传到设备：
+首次 run `45612411796` 编译失败（make 目标名用了 Package 名 `openwrt-fttr`，
+但 feed 里的真实目录是 `fttr`）。已修复 workflow（按真实 feed 目录编译 + 串行详细日志 +
+失败时上传诊断），并在 run `45619341303` 重新编译中。完成后从该 run 的 artifact
+`fttr-packages` 下载 `openwrt-fttr-*.apk`，传到设备：
 
 ```bash
 scp openwrt-fttr-*.apk root@10.1.1.1:/tmp/
