@@ -1,5 +1,29 @@
 # 2026-11-24 夜间/上午工作日志
 
+## 第 3 轮：FTTR 端口数统一 + 拓扑图重做（2026-11-25，在线增量，不重刷固件）
+用户实测 v30：设 `lan_ports=1` 后 br-lan 确实只剩 1 个 fttr 口，但**前端下联端口仍画 16 张卡、
+拓扑图节点一大堆且报 stale/unavailable，网络→设备页仍 16 个 fttrX**。要求在线升级、不再全量编译。
+
+### 根因（三处独立）
+1. 前端下联端口：`status.rs` 按 `ONU_COUNT=16` 生成 `switch_ports`，前端照单全收。
+2. 拓扑图：upstream 用 AntV G6 + 3 个脆弱 ubus（get_topology/_node/_clients）+ snapshot 机制，
+   定制固件频繁 "sources unavailable / stale snapshot / issues"。
+3. 设备页 fttr1~16：内核驱动 `fmcs_netdevs_init()` 硬编码循环 register_netdev 16 个，
+   无端口数 module_param、netdev_ops 无 dellink → 用户态删不掉。按用户选择**本轮不动驱动**。
+
+### 方案（界面层根治，lan_ports=N 作唯一真相源）
+- 前端 `index.tsx`：H3C 读 UCI `lan_ports`，下联端口只画 fttr1..N，多余折叠为说明行；load() 加 uci.load。
+- 前端 `topology.tsx`：**完全重写**，去 G6/snapshot 链，改基于稳定 `get_status` 的轻量分层树
+  （OLT→N 条 PON→ONU），只显示 N 分支；新增 `topology-lite.css` 内联；`index.css` 加折叠说明样式。
+- 本地 `npm run typecheck` + `npm run build` 通过；topology.js 降到 63 kB（无 G6 实际调用）。
+
+### 交付
+- 在线覆盖 3 个 bundle：`online-fix/frontend/{config,index,topology}.js`
+  md5 config=6d4a369a8fedeb3b173b90ad0baf52a6 / index=5398934a693818748da09e2e812a8aa7 /
+  topology=9cca77fb93ec013c9eaa4fd38636235b；scp 覆盖后 Ctrl+F5 即生效。
+- 前端 fork `likz0421/luci-app-fttr`：main@3884317（源码 4 文件）、package@9eec61a（9 bundle）。
+- 后端 apk 单包编译 run#1（id 45612411796）仍 in_progress，用于修 config_check h3c + PPE counters（可选升级）。
+
 ## 最终可用固件（2026-11-25 晚上）
 **Release v30**（构建 #30，green，当前唯一版本）：
 https://github.com/likz0421/an7581-ci/releases/tag/v30
