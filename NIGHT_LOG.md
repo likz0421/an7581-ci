@@ -49,6 +49,14 @@ https://github.com/likz0421/an7581-ci/releases/tag/v30
 - `/etc/config/fttr`：含 H3C 端口数说明与 `# config h3c` 示例 ✓
 结论：三层改动全部真正打进 v30 固件，非仅源码分支。
 
+## 2026-11-25 晚：FTTR 前后端 bug 修复（v30 实测反馈，在线增量升级）
+用户 v30 实测：lan_ports=1 重启后 br-lan 只剩 1 fttr（后端生效✓），但报 3 个问题：
+1. `unsupported section: h3c`（config_check 失败）— 后端 templates.rs section 白名单不含 h3c。修复：白名单+allowed+1~16 校验+business_canonical 排除。
+2. 前端 `Saved/active 1/16·待重启` 误报 — basic.tsx 把 active 错算成 ONU 总数。修复：移除错误对比改准确说明；FiberHome 同类一并修。
+3. `PPE counters: unavailable/invalid/overflowing` — ppe.rs 把空 bind 表误报成错误。修复：仅采样到 flow 数据无效才报错。
+推送：后端 an7581-custom@8fb254e，前端 package@a4275e6/main@5c933a6。
+在线升级（不重刷固件）：前端 config.js 自包含可直接 scp 覆盖（online-fix/frontend/config.js）；后端 apk 由新 workflow build-fttr-packages.yml 编译（run#1）。详见 online-fix/README.md。
+
 旧记录（v26）见下方。
 
 ## 2026-11-25 下午整改：apk 产物校验误判
