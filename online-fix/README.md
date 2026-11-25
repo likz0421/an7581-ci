@@ -4,6 +4,39 @@
 
 ---
 
+## 推荐入口：一键脚本（离线自包含，大陆网络友好）
+
+`fttr-oneclick.sh` 把三个前端 bundle 以 base64 **全部内嵌**，升级过程不访问 GitHub 或任何外网，
+只需 scp 这一个文件到设备即可完成检测、安装、状态查看和卸载回退：
+
+```bash
+scp online-fix/fttr-oneclick.sh root@10.1.1.1:/tmp/
+ssh root@10.1.1.1
+sh /tmp/fttr-oneclick.sh check       # 只读检测：OpenWrt 版本/架构、apk 或 opkg、LuCI 路径、fttrd、lan_ports
+sh /tmp/fttr-oneclick.sh all         # 一键：备份 -> 安装 -> md5 校验 -> 清 LuCI 缓存
+sh /tmp/fttr-oneclick.sh status      # 查看三个 bundle 的安装版本与 md5
+sh /tmp/fttr-oneclick.sh uninstall   # 从最近备份恢复，可随时回退
+```
+
+后端 apk 编译完成后，把 apk 也 scp 到设备，用**同一个脚本**带参数安装（同样不访问外网）：
+
+```bash
+scp openwrt-fttr-*.apk root@10.1.1.1:/tmp/
+sh /tmp/fttr-oneclick.sh all /tmp/openwrt-fttr-xxxx.apk
+```
+
+脚本特性：
+
+- 自动识别设备实际 LuCI 目录（`/www/luci-static/...` 或 `/usr/share/luci/htdocs/...`），不写死路径。
+- 覆盖前自动备份到 `/etc/fttr-oneclick/backup/<时间戳>/`；任一文件校验失败自动回滚。
+- 写入后逐文件 md5 校验，避免传输出错导致 LuCI 白屏。
+- `check` / `status` 完全只读，可先跑一遍确认设备现状。
+- 文件 md5：config `6d4a369a8fedeb3b173b90ad0baf52a6` / index `5398934a693818748da09e2e812a8aa7` / topology `9cca77fb93ec013c9eaa4fd38636235b`。
+
+下面的"方式 A / 方式 B"是手动等效步骤，供不想用脚本时参考。
+
+---
+
 ## 本轮（第 3 轮）新增修复：端口数统一 + 拓扑图重做
 
 用户实测反馈：把 `FTTR LAN port count` 设为 1、br-lan 里确实只剩 1 个 fttr 口了，但
@@ -81,6 +114,30 @@ ubus call fttr config_check   # 期望 {"valid":true,...}，不再报 unsupporte
 - 全量固件编译约 1h48m，改个小 bug 都重刷固件太慢。
 - 前端是纯 JS，覆盖文件零编译、立即生效、不碰任何配置。
 - 后端单独编译 apk 在线安装，不动现有 LAN/WiFi/FTTR 端口数设置。
+
+## 关于「重新编译固件」与「要不要动驱动」
+
+**Q：单纯重新编一个固件，设备里那 16 个 fttr netdev 会变少吗？**
+
+**不会。** 这 16 个接口来自内核驱动 `fmcs`，源码里是写死的：
+
+- `fmcs.h:114` → `#define FMCS_MAX_FTTR_PORTS 16`
+- `fmcs_netdevs_init()` → `for (i = 0; i < FMCS_MAX_FTTR_PORTS; i++) { ... register_netdev("fttr%d", i+1); }`
+- 驱动**没有任何端口数 module_param**，`netdev_ops` 里也没有 `ndo_dellink`，用户态删不掉。
+
+所以只要源码不改，重编多少次、刷多少次固件都还是 16 个。驱动有没有参数可实测：
+`ls /sys/module/fmcs/parameters/`（本固件里只有 offload/spi 相关参数，没有端口数）。
+
+**Q：那要不要动驱动？**
+
+| 方案 | 收益 | 代价 / 风险 |
+| --- | --- | --- |
+| 界面层收敛（已交付） | FTTR 概览/拓扑/配置只显示 N 个；纯 JS 在线覆盖，零业务中断 | 网络→设备页内核 netdev 仍 16 个（客观存在） |
+| 改驱动参数化重编 kmod | 开机只注册 N 个 netdev，设备页也只剩 N 个，物理根治 | 需把循环上限改成可配置，并给所有按 port 访问 `fttr_devs[]` 的位置（约 8 处）补边界/NULL 检查，否则 port>N 会内核 oops；在线替换 kmod 瞬间 PON 断流，且与 fttrd/FPGA 强耦合 |
+
+**建议：当前不动驱动。** 先用已交付的界面层收敛满足"只看 N 个"的诉求（低风险、即时生效）；
+驱动改造放到下一次固件构建窗口一并做，避免在线替换内核模块打断业务。若确定要做，
+下一步可以把 `fmcs` 的端口数参数化补丁准备好推到 fork，随下次固件编译生效。
 
 ## 提交记录
 

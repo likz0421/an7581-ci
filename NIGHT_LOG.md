@@ -24,6 +24,20 @@
 - 前端 fork `likz0421/luci-app-fttr`：main@3884317（源码 4 文件）、package@9eec61a（9 bundle）。
 - 后端 apk 单包编译 run#1（id 45612411796）仍 in_progress，用于修 config_check h3c + PPE counters（可选升级）。
 
+### 第 4 轮：一键升级脚本 + 驱动改造评估（2026-11-25）
+- 用户问：硬编码 16 口重编固件能否改善、要不要动驱动；要求一键在线升级脚本（大陆环境改善、
+  自动检测设备 OpenWrt、支持卸载/更新/检测/安装）。
+- **驱动评估结论**：单纯重编、源码不变 → 仍 16 个。证据 `fmcs.h:114 #define FMCS_MAX_FTTR_PORTS 16`、
+  `fmcs_netdevs_init()` 硬编码 `for(i<16) register_netdev("fttr%d")`、无端口数 module_param、
+  netdev_ops 无 ndo_dellink。参数化需改循环上限并给约 8 处 `fttr_devs[]` 访问补边界/NULL 检查，
+  否则 port>N 内核 oops；在线换 kmod 会断 PON。建议当前不动驱动，下次固件构建窗口一并做。
+- 交付 `online-fix/fttr-oneclick.sh`：自包含离线脚本（3 个 bundle base64 内嵌，零外网依赖 = 大陆环境根治），
+  支持 check/status/install/update/uninstall/all；自动检测 OpenWrt 版本/架构/apk-opkg/LuCI 路径/fttrd/lan_ports；
+  覆盖前备份到 `/etc/fttr-oneclick/backup/<ts>/`，任一失败自动回滚，写入后 md5 校验；
+  后端 apk 用参数本地传入，同样不访问外网。
+- 端到端模拟测试通过：check/install/status/uninstall 退出码均 0，3 个 md5 正确，卸载精确恢复原文件
+  （修复了安装成功后因末尾 `[ -n "$x" ] &&` 导致退出码 1 的误报）。
+
 ## 最终可用固件（2026-11-25 晚上）
 **Release v30**（构建 #30，green，当前唯一版本）：
 https://github.com/likz0421/an7581-ci/releases/tag/v30
