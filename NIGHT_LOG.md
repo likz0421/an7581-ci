@@ -24,6 +24,12 @@
 - 前端 fork `likz0421/luci-app-fttr`：main@3884317（源码 4 文件）、package@9eec61a（9 bundle）。
 - 后端 apk 单包编译 run#1（id 45612411796）仍 in_progress，用于修 config_check h3c + PPE counters（可选升级）。
 
+### 第 5 轮：单包编译失败→改全量固件 v31（2026-11-25 晚）
+- 后端 apk 单包编译 run#1(45612411796) 失败：make 目标用了 Package 名 `openwrt-fttr` 而非真实目录 `package/feeds/fttr/fttr`。修 workflow(80908a07) 后 run#2(45619341303) 仍失败。
+- run#2 诊断 artifact 揭示根因：fttr 包 DEPENDS `+kmod-h3c-fmcs`（内核模块），`make package/fttr/compile` 连带编内核依赖 `gpio-button-hotplug`，因缺 `linux-6.18.60/.config` 失败；且 rustc 1.96.1 从源码自举 host-compile 耗时约 88 分钟（比 toolchain 35 分钟还长）。
+- **结论：单包编译 = 半个固件编译，省不掉时间**。两个后端 bug（config_check h3c 误报、PPE 空闲提示）不影响功能（lan_ports 实际已生效）。经用户选择「改成全量固件编译」，触发 build-an7581.yml run=45704267034 编 v31，一步到位含前后端全部修复。后台 watch-full31.js 监控。
+- 诊断经验：OpenWrt kmod 依赖使单包编译必须 prepare 内核；Rust 包 host 自举是最大耗时；打包 apk 需 compile+install 两步。
+
 ### 第 4 轮：一键升级脚本 + 驱动改造评估（2026-11-25）
 - 用户问：硬编码 16 口重编固件能否改善、要不要动驱动；要求一键在线升级脚本（大陆环境改善、
   自动检测设备 OpenWrt、支持卸载/更新/检测/安装）。

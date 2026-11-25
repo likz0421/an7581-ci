@@ -92,11 +92,16 @@ scp online-fix/frontend/topology.js root@10.1.1.1:/www/luci-static/resources/vie
 
 ## 升级方式 B：后端 apk（修复 bug #1、#3，可选）
 
+> **状态更新（重要）**：后端 apk 单包编译已证实不可行——fttr 包依赖内核模块 `kmod-h3c-fmcs`，
+> 连带要 prepare 整个内核，且 Rust 编译器从源码自举要 88 分钟，本质是"半个固件编译"。
+> 这两个后端 bug（配置校验误报、PPE 空闲提示）不影响功能。经决策改为**全量固件编译 v31**
+> （`build-an7581` run `45704267034`，进行中），一步到位含前后端全部修复，刷机后即无需任何在线覆盖。
+> 以下方式 B 的 apk 路径仅作历史保留，不再推荐。
+
 后端 fttrd 是编译后的二进制，需升级 apk。GitHub Actions workflow `build-fttr-packages`
 首次 run `45612411796` 编译失败（make 目标名用了 Package 名 `openwrt-fttr`，
-但 feed 里的真实目录是 `fttr`）。已修复 workflow（按真实 feed 目录编译 + 串行详细日志 +
-失败时上传诊断），并在 run `45619341303` 重新编译中。完成后从该 run 的 artifact
-`fttr-packages` 下载 `openwrt-fttr-*.apk`，传到设备：
+但 feed 里的真实目录是 `fttr`）。修复后 run `45619341303` 仍失败（内核依赖 + Rust 自举耗时）。
+若将来从该 workflow 的 artifact `fttr-packages` 拿到 `openwrt-fttr-*.apk`，传到设备：
 
 ```bash
 scp openwrt-fttr-*.apk root@10.1.1.1:/tmp/
