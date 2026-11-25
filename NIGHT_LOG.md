@@ -1,12 +1,45 @@
 # 2026-11-24 夜间/上午工作日志
 
-## 最终可用固件（2026-11-25 下午）
-**Release v26**（构建 #26，green，当前唯一版本）：
-https://github.com/likz0421/an7581-ci/releases/tag/v26
+## 最终可用固件（2026-11-25 晚上）
+**Release v30**（构建 #30，green，当前唯一版本）：
+https://github.com/likz0421/an7581-ci/releases/tag/v30
 
-构建 #26 产物校验全部通过：honk / luci-app-honk / luci-app-airoha-npu / kmod-h3c-fmcs /
-h3c-fmcs-firmware / openwrt-fttr / luci-app-fttr 的 apk 均存在，两个 HM2004 itb 附件齐全。
-Release 只保留 v26；失败/取消的 #16~#27 构建记录已删除。
+构建 #30 全部步骤 success（Build / Verify / Upload / Create Release），含本轮三层整改：
+出厂默认值（IP/WiFi）、FTTR 前端 bundle 重建、FTTR 后端接口数 UCI 可配置。
+两个 HM2004 itb 附件齐全（sysupgrade 36.2MB + recovery 30.1MB），artifact an7581-run-30 70.7MB。
+
+## 2026-11-25 晚上整改：出厂默认值 + FTTR 前后端
+用户反馈：IP 仍是 192.168.1.1、WiFi 未改、FTTR 前端"优化"没进固件、16 个 fttr 口太多想自定义。
+
+### 根因
+1. IP/WiFi：旧脚本靠精确匹配 `192.168.1.1`/`OpenWrt` 判断，但新版 PonWrt 的 board.d
+   在启动较晚阶段才生成网络/WiFi 配置，判断时机和值都对不上 → 永远不触发。
+2. FTTR 前端美化：CI 只拉 package 分支（编译好的 bundle），之前的修复改在 main 源码分支，
+   从未重新构建推 package → 固件里根本没有修复。
+3. fttr 口：H3C 后端 setup_bridge 把 16 个下游口全桥进 br-lan，前端无数量配置。
+
+### 修复（全部落地并推送，构建 #30 验证 through）
+- **层1 默认值**：`files/etc/uci-defaults/10-hanzi-defaults` + `files/etc/rc.local` 改为
+  "首启标记"机制（`/etc/hanzi-defaults-applied`）：全新刷机首启无条件写 LAN 10.1.1.1、
+  DHCP .2 起 36h、WiFi hanzi/hanziwawa，打标记；之后开机/保留配置升级不再动用户设置。
+  不再依赖出厂字符串判断。sh -n 语法检查通过。（commit f503385）
+- **层2 前端**：本地搭前端构建环境（clone + npm install + rsbuild build 成功），
+  源码改动推 main、重新构建的 9 个 bundle 推 package 分支（luci-app-fttr）。
+- **层3 FTTR 接口数**：
+  - 后端 fork `likz0421/openwrt-fttr` 建 `an7581-custom` 分支（4c4cfe0）：
+    新增 `setup_bridge_limited()` + `configured_lan_ports()`，读 UCI `fttr.h3c.lan_ports`
+    （1~16，默认16）只桥接前 N 个，其余从 br-lan 移除并 down。
+  - 前端 config 页加 "FTTR LAN port count" 输入框（1~16）+ 保存/生效状态显示，bundle 已推 package。
+  - `scripts/configure.sh` 的 fttr feed 指向 fork 的 an7581-custom 分支（commit 2608eff）。
+- 用法：网页 FTTR→配置→基本 改端口数后 Restart；或
+  `uci set fttr.h3c.lan_ports=4 && uci commit fttr && /etc/init.d/fttr restart`。不配置=保持16。
+
+### 已知边界
+- fttr netdev 本身由内核驱动按硬件槽位创建（16 个），未改内核驱动（避免交叉编译风险），
+  故"设备"列表仍会看到 fttr 口；但 br-lan 里只保留设定的 N 个（截图2的核心痛点已解决）。
+- 本机无 cargo，Rust 后端改动靠 CI 编译验证；#30 Build:success 证明编译通过。
+
+旧记录（v26）见下方。
 
 ## 2026-11-25 下午整改：apk 产物校验误判
 - 现象：#23 编译成功但 `Verify build outputs` 失败，报 required packages missing；
