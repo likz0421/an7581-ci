@@ -131,8 +131,10 @@ jobs:
           echo "=== firmware images ==="
           find ponwrt/bin -name '*.itb' | sort || true
           fail=0
+          # ipk: honk_1.0-r1.ipk / apk: honk-1.0-r1.apk — both must be accepted.
           check() {
-            if find ponwrt/bin \( -name "$1*.ipk" -o -name "$1*.apk" \) | grep -q .; then
+            base="${1%_}"
+            if find ponwrt/bin \( -name "${base}_*.ipk" -o -name "${base}_*.apk" -o -name "${base}-*.apk" \) | grep -q .; then
               echo "  ok   $1"
             else
               echo "  MISS $1"; fail=1
@@ -146,6 +148,12 @@ jobs:
             check 'h3c-fmcs-firmware_'
             check 'openwrt-fttr_'
             check 'luci-app-fttr_'
+          fi
+          # The firmware itself is the deliverable: never release without the HM2004 sysupgrade image.
+          if find ponwrt/bin/targets/airoha/an7581 -name '*-h3c_hm2004-du-squashfs-sysupgrade.itb' | grep -q .; then
+            echo "  ok   h3c_hm2004-du-squashfs-sysupgrade.itb"
+          else
+            echo "  MISS h3c_hm2004-du-squashfs-sysupgrade.itb"; fail=1
           fi
           if [ "$fail" = "1" ]; then
             echo "::error::required packages missing from build output - refusing to release (see diagnostics/manifest-run-${{ github.run_number }}.txt)"
