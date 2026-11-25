@@ -1,0 +1,19 @@
+#!/bin/sh
+# HM2004 默认网络设置：LAN = 10.1.1.1/24（首启时应用；保留用户后续修改）
+. /lib/functions.sh
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+# 仅当 lan 还是出厂默认（或还没配置）时改成 10.1.1.1
+ip="$(uci -q get network.lan.ipaddr)"
+if [ -z "$ip" ] || [ "$ip" = "192.168.1.1" ]; then
+	uci -q batch <<-EOF
+		set network.lan.ipaddr='10.1.1.1'
+		set network.lan.netmask='255.255.255.0'
+	EOF
+fi
+
+board_config_flush
+
+exit 0

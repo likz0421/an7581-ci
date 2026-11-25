@@ -1,0 +1,16 @@
+#!/bin/sh
+# HM2004 默认 DHCP：从 10.1.1.2 起顺序分配，租约 36 小时
+# dnsmasq 默认就是按顺序分配（未设 seed），这里只固定 start/limit/leasetime
+. /lib/functions.sh
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+# start/limit/leasetime 未设置时才写，避免覆盖用户修改
+[ -z "$(uci -q get dhcp.lan.start)" ] && uci -q set dhcp.lan.start='2'
+[ -z "$(uci -q get dhcp.lan.limit)" ] && uci -q set dhcp.lan.limit='253'
+[ -z "$(uci -q get dhcp.lan.leasetime)" ] && uci -q set dhcp.lan.leasetime='36h'
+
+board_config_flush
+
+exit 0

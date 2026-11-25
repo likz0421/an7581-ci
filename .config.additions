@@ -1,0 +1,46 @@
+# =============================================================
+# 自定义软件包（追加在 PonWrt configs/an7581.config 之上）
+# 规格：eBPF Honk + 芯片状态（Airoha NPU 监控）+ openFTTR
+# =============================================================
+
+# --- 目标设备：只编 H3C HM2004-DU ---
+# PonWrt 默认 config 会启用 13 种 AN7581 设备（FiberHome/Nokia/Zyxel 等），
+# 但只有 HM2004-DU 带 OLT 下行光口、能跑 openFTTR，其他设备全部取消
+CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_h3c_hm2004-du=y
+CONFIG_TARGET_DEVICE_PACKAGES_airoha_an7581_DEVICE_h3c_hm2004-du=""
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_fiberhome_an4475-g2 is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_fiberhome_hg5382a is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_fiberhome_hg5585f-ct is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_fiberhome_hg5585f-ct-usb-sfp is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_fiberhome_hg5585f-cu is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_fiberhome_hg5585f-cu-usb-sfp is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_gemtek_xg2010g is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_nokia_xg-040g-md-ubi is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_nokia_xg-040g-md-ubi-usb-sfp is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_nokia_xg-040g-tf-ubi is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_unionman_ung00a is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_znxt_zn504xg-d is not set
+# CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_znxt_zn515xg-d is not set
+
+# --- eBPF 透明代理：Honk（kenzok8/openwrt-honk：honk 核心 + Doona 界面 + LuCI 管理页）---
+CONFIG_PACKAGE_honk=y
+CONFIG_PACKAGE_luci-app-honk=y
+
+# --- 芯片状态：Airoha AN7581/AN7583 NPU/CPU/Frame Engine/PPE 监控 ---
+# 来源：DenzelVincent/luci-app-airoha-npu v1.3.1（rchen14b 的中文增强 fork）
+# configure.sh 会把仓库里的 luci-app-airoha-npu/ 包拷到 package/ 下
+CONFIG_PACKAGE_luci-app-airoha-npu=y
+# Frame Engine 寄存器读写需要 busybox devmem
+CONFIG_BUSYBOX_CONFIG_DEVMEM=y
+
+# --- 关闭 Passwall 全家桶（不需要）---
+# an7581.config 默认带 luci-app-passwall + 一票 INCLUDE，这里全部关掉
+# CONFIG_PACKAGE_luci-app-passwall is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Haproxy is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geoview is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray is not set

@@ -1,0 +1,29 @@
+#!/bin/sh
+# HM2004 WiFi 默认：2.4G/5G 均 SSID=hanzi，WPA2-PSK 密码 hanziwawa
+# 每次启动都跑但幂等：只改写"未配置或仍是出厂 OpenWrt"的接口，
+# 用户改过 SSID 之后不会动。
+. /lib/functions.sh
+
+i=0
+changed=0
+while true; do
+	ssid="$(uci -q get wireless."@wifi-iface[$i]".ssid)"
+	[ -z "$ssid" ] && break
+	if [ "$ssid" = "OpenWrt" ] || [ "$ssid" = "" ]; then
+		uci -q set wireless."@wifi-iface[$i]".ssid='hanzi'
+		uci -q set wireless."@wifi-iface[$i]".network='lan'
+		[ -z "$(uci -q get wireless."@wifi-iface[$i]".encryption)" ] && \
+			uci -q set wireless."@wifi-iface[$i]".encryption='psk2+ccmp'
+		uci -q set wireless."@wifi-iface[$i]".key='hanziwawa'
+		changed=1
+	fi
+	i=$((i + 1))
+	[ "$i" -gt 16 ] && break
+done
+
+if [ "$changed" = "1" ]; then
+	uci commit wireless 2>/dev/null
+	/etc/init.d/wifi restart 2>/dev/null
+fi
+
+exit 0
