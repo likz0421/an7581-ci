@@ -13,7 +13,7 @@ H3C HM2004-DU（Airoha AN7581）PonWrt 自动编译，只看需要的这几样�
 
 | 项目 | 默认 | 生效方式 |
 | --- | --- | --- |
-| LAN IP | `10.1.1.1/24` | `/etc/uci-defaults/10-hanzi-defaults`：每次启动检查，仍是 192.168.1.1 才改 |
+| LAN IP | `10.1.1.1/24` | `/etc/uci-defaults/10-hanzi-defaults`：首启（含 sysupgrade 后首启）检查，仍是 192.168.1.1 才改 |
 | DHCP | 从 `10.1.1.2` 起、顺序分配、租约 `36h` | 同上；仍是出厂 100/150/12h 才改 |
 | WiFi 2.4G/5G | SSID `hanzi`，WPA2 密码 `hanziwawa` | `/etc/rc.local`：服务启动后改名，覆盖所有射频（全新刷机首启即生效） |
 
@@ -26,7 +26,7 @@ H3C HM2004-DU（Airoha AN7581）PonWrt 自动编译，只看需要的这几样�
 
 1. `configure.sh` 在 `make defconfig` 后校验必需包必须为 `=y`，缺一个直接失败
 2. `make defconfig` 遇到上游 feed 的 kconfig 递归依赖错误会自动摘掉坏包重试（最多 4 次）
-3. 构建后 `Verify build outputs` 检查 apk/ipk 产物是否真的存在，缺包拒绝发版
+3. 构建后 `Verify build outputs` 检查 apk/ipk 产物是否真的存在（同时兼容 `name_version.ipk` 和 `name-version.apk` 两种命名），并强制要求 HM2004 sysupgrade itb 存在，缺包拒绝发版
 4. 每次构建都把产物清单（itb + 相关 apk/ipk）提交到 `diagnostics/manifest-run-N.txt`
 
 ## 内核选项（configure.sh 自动注入 `target/linux/airoha/an7581/config-6.18`）
