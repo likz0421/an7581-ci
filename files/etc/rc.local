@@ -1,29 +1,56 @@
 #!/bin/sh
 # Put your custom commands here that should be executed once
-# the system init finished. By default this file does nothing.
+# the system init finished.
 
-# ---- HM2004 出厂 WiFi 默认值：2.4G/5G 均为 SSID=hanzi，WPA2 密码 hanziwawa ----
-# 放在 rc.local 是因为它在本机服务（含 wifi）启动之后执行，此时所有射频都已生成，
-# 全新刷机第一次开机也能正确改名；只改仍是出厂 "OpenWrt"/空 的接口，用户改过不动。
-changed=0
-i=0
-while true; do
-	ssid="$(uci -q get wireless."@wifi-iface[$i]".ssid)"
-	[ -z "$ssid" ] && break
-	if [ "$ssid" = "OpenWrt" ] || [ "$ssid" = "" ]; then
-		uci -q set wireless."@wifi-iface[$i]".ssid='hanzi'
-		uci -q set wireless."@wifi-iface[$i]".network='lan'
-		[ -z "$(uci -q get wireless."@wifi-iface[$i]".encryption)" ] && \
-			uci -q set wireless."@wifi-iface[$i]".encryption='psk2+ccmp'
-		uci -q set wireless."@wifi-iface[$i]".key='hanziwawa'
-		changed=1
+# ============================================================
+# HM2004 出厂默认值（仅首次刷机生效）
+# ------------------------------------------------------------
+# 放在 rc.local 而不是 uci-defaults：新版 PonWrt 的 board.d 在
+# 首次启动较晚阶段才生成 /etc/config/network 与 wireless，
+# rc.local 运行时这些配置已就绪，写值不会被 board.d 覆盖。
+#
+# 用标记文件保证"只设一次"：
+#   - 全新刷机（不保留配置）：标记不存在 -> 无条件写默认值 -> 打标记
+#   - 之后每次开机 / 保留配置升级：标记存在 -> 完全不碰你的设置
+# 所以你后续在网页上改的 IP / WiFi 不会被覆盖。
+# ============================================================
+MARK=/etc/hanzi-defaults-applied
+
+if [ ! -f "$MARK" ]; then
+	changed=0
+
+	# ---- LAN = 10.1.1.1/24 ----
+	uci -q set network.lan.ipaddr='10.1.1.1'
+	uci -q set network.lan.netmask='255.255.255.0'
+	changed=1
+
+	# ---- DHCP：从 .2 起顺序分配，租约 36h ----
+	uci -q set dhcp.lan.start='2'
+	uci -q set dhcp.lan.limit='253'
+	uci -q set dhcp.lan.leasetime='36h'
+	changed=1
+
+	# ---- WiFi：所有射频 SSID=hanzi / WPA2 密码 hanziwawa ----
+	i=0
+	while uci -q get "wireless.@wifi-iface[$i]" >/dev/null 2>&1; do
+		uci -q set "wireless.@wifi-iface[$i].ssid"='hanzi'
+		uci -q set "wireless.@wifi-iface[$i].network"='lan'
+		uci -q set "wireless.@wifi-iface[$i].encryption"='psk2+ccmp'
+		uci -q set "wireless.@wifi-iface[$i].key"='hanziwawa'
+		i=$((i + 1))
+		[ "$i" -gt 16 ] && break
+	done
+	[ "$i" -gt 0 ] && changed=1
+
+	if [ "$changed" = "1" ]; then
+		uci commit network 2>/dev/null
+		uci commit dhcp 2>/dev/null
+		uci commit wireless 2>/dev/null
+		# 写标记：只有配置提交成功才打，避免下次不重试
+		echo ok > "$MARK"
+		# 延迟应用，等服务完全起来；重启网络会短暂断连，仅限首次
+		( sleep 3; /etc/init.d/network restart >/dev/null 2>&1; wifi reload >/dev/null 2>&1 ) >/dev/null 2>&1 &
 	fi
-	i=$((i + 1))
-	[ "$i" -gt 16 ] && break
-done
-if [ "$changed" = "1" ]; then
-	uci commit wireless 2>/dev/null
-	( sleep 2; wifi reload ) >/dev/null 2>&1 &
 fi
 
 exit 0
