@@ -39,6 +39,16 @@ https://github.com/likz0421/an7581-ci/releases/tag/v30
   故"设备"列表仍会看到 fttr 口；但 br-lan 里只保留设定的 N 个（截图2的核心痛点已解决）。
 - 本机无 cargo，Rust 后端改动靠 CI 编译验证；#30 Build:success 证明编译通过。
 
+### 交付验证（v30 固件二进制级，2026-11-25 晚）
+解包 v30 sysupgrade.itb 的 squashfs rootfs（PySquashfsImage from_file offset），逐项确认：
+- `/etc/rc.local`：含首启标记机制全文（10.1.1.1 / DHCP .2-36h / hanzi+hanziwawa / MARK=/etc/hanzi-defaults-applied）✓
+- `/etc/uci-defaults/10-hanzi-defaults`：含双保险写入逻辑 ✓
+- `/www/luci-static/resources/view/fttr/config.js`（85035 字符）：含 lan_ports / FTTR LAN port count /
+  自动 `uci.add("fttr","h3c","h3c")` + `set lan_ports 16` ✓
+- `/usr/sbin/fttrd`（7.4MB 二进制）：含 `lan_ports` 字符串（后端读 UCI 的 option 名）✓
+- `/etc/config/fttr`：含 H3C 端口数说明与 `# config h3c` 示例 ✓
+结论：三层改动全部真正打进 v30 固件，非仅源码分支。
+
 旧记录（v26）见下方。
 
 ## 2026-11-25 下午整改：apk 产物校验误判
