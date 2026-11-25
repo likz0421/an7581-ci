@@ -58,7 +58,7 @@ jobs:
         run: |
           set +e
           export CCACHE_DIR=~/.ccache
-          ( cd ponwrt && make -j"$(nproc)" toolchain/install ) > /tmp/toolchain.log 2>&1
+          ( cd ponwrt && make -j"$(nproc)" tools/install toolchain/install ) > /tmp/toolchain.log 2>&1
           rc=$?
           echo "=== toolchain rc=$rc ==="
           tail -n 80 /tmp/toolchain.log
@@ -68,15 +68,57 @@ jobs:
         run: |
           set +e
           export CCACHE_DIR=~/.ccache
-          ( cd ponwrt && make -j"$(nproc)" \
-              package/openwrt-fttr/compile \
-              package/h3c-fmcs/compile \
-              package/h3c-fmcs-firmware/compile \
-              package/luci-app-fttr/compile ) > /tmp/pkgbuild.log 2>&1
+          (
+            cd ponwrt || exit 1
+            # IMPORTANT: make targets use the PACKAGE DIR name, not the Package/ name.
+            # openwrt-fttr lives at feeds/fttr/package/fttr -> package/feeds/fttr/fttr
+            resolve() {
+              for cand in "package/$1" "package/feeds/fttr/$1"; do
+                [ -d "$cand" ] && { echo "$cand"; return 0; }
+              done
+              return 1
+            }
+            dirs=""
+            for name in openwrt-fttr fttr h3c-fmcs h3c-fmcs-firmware luci-app-fttr; do
+              d=$(resolve "$name") || continue
+              case " $dirs " in *" $d "*) continue ;; esac
+              dirs="$dirs $d"
+            done
+            echo "resolved package dirs:$dirs"
+            [ -z "$dirs" ] && { echo "NO PACKAGE DIRS RESOLVED"; exit 3; }
+            rc=0
+            for d in $dirs; do
+              echo "===== compile $d ====="
+              make -j1 V=s "$d/compile" || { rc=$?; break; }
+              echo "===== install $d ====="
+              make -j1 "$d/install" || { rc=$?; break; }
+            done
+            exit $rc
+          ) > /tmp/pkgbuild.log 2>&1
           rc=$?
           echo "=== pkg build rc=$rc ==="
-          tail -n 150 /tmp/pkgbuild.log
+          echo "=== ERROR LINES ==="
+          grep -n -iE "error|failed|no such file|not found|cargo|rustc|undefined reference" /tmp/pkgbuild.log | tail -100 || true
+          echo "=== PACKAGE BUILD LOGS ==="
+          find ponwrt/logs -type f -path '*fttr*' -o -path '*fmcs*' 2>/dev/null | head -40 || true
+          for f in $(find ponwrt/logs -type f \( -path '*openwrt-fttr*' -o -path '*h3c-fmcs*' \) 2>/dev/null | head -6); do
+            echo "----- $f -----"; tail -n 80 "$f"
+          done
+          echo "=== TAIL 200 ==="
+          tail -n 200 /tmp/pkgbuild.log
           exit $rc
+
+      - name: Upload build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fttr-build-diagnostics
+          path: |
+            /tmp/pkgbuild.log
+            /tmp/toolchain.log
+            /tmp/configure.log
+            ponwrt/logs/
+          if-no-files-found: warn
 
       - name: Collect packages
         run: |
