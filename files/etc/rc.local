@@ -1,0 +1,29 @@
+#!/bin/sh
+# Put your custom commands here that should be executed once
+# the system init finished. By default this file does nothing.
+
+# ---- HM2004 出厂 WiFi 默认值：2.4G/5G 均为 SSID=hanzi，WPA2 密码 hanziwawa ----
+# 放在 rc.local 是因为它在本机服务（含 wifi）启动之后执行，此时所有射频都已生成，
+# 全新刷机第一次开机也能正确改名；只改仍是出厂 "OpenWrt"/空 的接口，用户改过不动。
+changed=0
+i=0
+while true; do
+	ssid="$(uci -q get wireless."@wifi-iface[$i]".ssid)"
+	[ -z "$ssid" ] && break
+	if [ "$ssid" = "OpenWrt" ] || [ "$ssid" = "" ]; then
+		uci -q set wireless."@wifi-iface[$i]".ssid='hanzi'
+		uci -q set wireless."@wifi-iface[$i]".network='lan'
+		[ -z "$(uci -q get wireless."@wifi-iface[$i]".encryption)" ] && \
+			uci -q set wireless."@wifi-iface[$i]".encryption='psk2+ccmp'
+		uci -q set wireless."@wifi-iface[$i]".key='hanziwawa'
+		changed=1
+	fi
+	i=$((i + 1))
+	[ "$i" -gt 16 ] && break
+done
+if [ "$changed" = "1" ]; then
+	uci commit wireless 2>/dev/null
+	( sleep 2; wifi reload ) >/dev/null 2>&1 &
+fi
+
+exit 0

@@ -1,0 +1,39 @@
+#!/bin/sh
+# HM2004 出厂默认值（每次启动运行，幂等）
+# 规则：仅当"还是出厂默认/未配置"时写入；用户改过的不动
+. /lib/functions.sh
+
+changed=0
+
+# ---------- LAN = 10.1.1.1/24（出厂或仍为 192.168.1.1 时生效） ----------
+ip="$(uci -q get network.lan.ipaddr)"
+if [ -z "$ip" ] || [ "$ip" = "192.168.1.1" ]; then
+	uci -q set network.lan.ipaddr='10.1.1.1'
+	uci -q set network.lan.netmask='255.255.255.0'
+	changed=1
+fi
+
+# ---------- DHCP：从 .2 起顺序分配，租约 36h（出厂 start=100/limit=150/leasetime=12h） ----------
+s="$(uci -q get dhcp.lan.start)"
+l="$(uci -q get dhcp.lan.limit)"
+t="$(uci -q get dhcp.lan.leasetime)"
+if [ -z "$s" ] || [ "$s" = "100" ]; then
+	uci -q set dhcp.lan.start='2'
+	changed=1
+fi
+if [ -z "$l" ] || [ "$l" = "150" ]; then
+	uci -q set dhcp.lan.limit='253'
+	changed=1
+fi
+if [ -z "$t" ] || [ "$t" = "12h" ]; then
+	uci -q set dhcp.lan.leasetime='36h'
+	changed=1
+fi
+
+# WiFi 默认值在 /etc/rc.local 里处理（服务起来后、多频都生成完再改名）
+
+if [ "$changed" = "1" ]; then
+	uci commit 2>/dev/null
+fi
+
+exit 0
