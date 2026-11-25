@@ -13,14 +13,28 @@ H3C HM2004-DU（Airoha AN7581）PonWrt 自动编译，只看需要的这几样�
 
 | 项目 | 默认 | 生效方式 |
 | --- | --- | --- |
-| LAN IP | `10.1.1.1/24` | `/etc/uci-defaults/10-hanzi-defaults`：首启（含 sysupgrade 后首启）检查，仍是 192.168.1.1 才改 |
-| DHCP | 从 `10.1.1.2` 起、顺序分配、租约 `36h` | 同上；仍是出厂 100/150/12h 才改 |
-| WiFi 2.4G/5G | SSID `hanzi`，WPA2 密码 `hanziwawa` | `/etc/rc.local`：服务启动后改名，覆盖所有射频（全新刷机首启即生效） |
+| LAN IP | `10.1.1.1/24` | 首次启动由 `/etc/uci-defaults/10-hanzi-defaults` 写入 + `/etc/rc.local` 兜底 |
+| DHCP | 从 `10.1.1.2` 起、顺序分配、租约 `36h` | 同上 |
+| WiFi 2.4G/5G | SSID `hanzi`，WPA2 密码 `hanziwawa` | `/etc/rc.local`：首次启动覆盖所有射频 |
 
-> **想让它生效**：刷机时选 **不保留配置**（sysupgrade `-n` / LuCI 取消勾选 "保留设置"）。
-> 保留旧配置时会话保留你原来的 SSID/密码，只有仍为出厂值的项会被改写。
+> **生效机制（仅首次刷机）**：全新刷机第一次开机检测到标记文件 `/etc/hanzi-defaults-applied` 不存在，
+> 无条件写入 IP/DHCP/WiFi 并打标记；之后每次开机 / 保留配置升级都不再改动，
+> 你在网页上改的 IP/WiFi 不会被覆盖。不再依赖 `192.168.1.1` / `OpenWrt` 这些出厂字符串判断。
 
 改默认值：编辑 [files/](files/) 下对应脚本，push 后重编。
+
+## FTTR 接口数量自定义（H3C HM2004-DU）
+
+固件默认把 16 个 fttr 下行口（fttr1~fttr16）全部桥进 br-lan。现在可以自定义只保留其中 N 个：
+
+- **网页改**：FTTR → 配置 → 基本 → **FTTR LAN port count**（1~16），保存后点 **Restart** 重启 fttrd 生效。
+- **命令行改**：`uci set fttr.h3c.lan_ports=4 && uci commit fttr && /etc/init.d/fttr restart`
+- 设置为 N 后，只有 `fttr1`~`fttrN` 留在 br-lan，其余口从桥里移除并 down。
+- 不配置或设为 16 = 使用全部端口（原厂行为）。
+
+> 该能力来自后端 fork [likz0421/openwrt-fttr `an7581-custom` 分支](https://github.com/likz0421/openwrt-fttr)
+> 与前端 [likz0421/luci-app-fttr](https://github.com/likz0421/luci-app-fttr) package 分支，
+> `configure.sh` 已把 fttr feed 指向该分支。
 
 ## 构建守卫（发版前自动检查，避免"构建成功但固件缺东西"）
 

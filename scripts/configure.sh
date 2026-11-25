@@ -45,8 +45,10 @@ echo "src-git honk https://github.com/kenzok8/openwrt-honk.git" >> feeds.conf.de
 sed -i 's|^src-git video .*|# &  # disabled: upstream qt5 kconfig recursive dependency|' feeds.conf.default
 sed -i 's|^src-git telephony .*|# &  # disabled: not needed for OLT firmware (also cuts build time)|' feeds.conf.default
 if [ "$WITH_FTTR" = "true" ]; then
-  echo "src-git fttr https://github.com/LazuliKao/openwrt-fttr.git" >> feeds.conf.default
-  echo "[feeds] fttr enabled (frontend comes from local package clone)"
+  # Use our fork's an7581-custom branch: adds UCI-configurable br-lan fttr port
+  # count (fttr.h3c.lan_ports) on top of upstream LazuliKao/openwrt-fttr.
+  echo "src-git fttr https://github.com/likz0421/openwrt-fttr.git;an7581-custom" >> feeds.conf.default
+  echo "[feeds] fttr enabled (our fork @an7581-custom: configurable lan_ports; frontend from local package clone)"
 fi
 if [ "$PR16" = "true" ]; then
   # feeds.conf syntax: <url>[;<ref>]  (branch refs use ';')
