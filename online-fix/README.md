@@ -1,10 +1,32 @@
-# FTTR 前后端修复 — 在线增量升级包（不重刷固件）
+# FTTR 前后端修复 — 交付说明
 
-本目录用于在**当前 OpenWrt（v30 及以后）上直接在线升级验证** FTTR 前后端修复，无需重刷完整固件。
+包含两条路径：**① v31 全量固件（前后端全部修复，推荐刷机）** 与 **② 在线增量升级包（不重刷固件）**。
 
 ---
 
-## 推荐入口：一键脚本（离线自包含，大陆网络友好）
+## 路径 ①：v31 全量固件（2026-11-26，前后端修复一步到位）
+
+`build-an7581` run `45704267034` 编译成功（9 步全绿），Release `v31 HM2004-DU PonWrt` 已发布。
+**已做二进制级验证**：从 sysupgrade.itb 解包 squashfs 确认前端 3 个 bundle 的 md5 与交付版一致、
+fttrd 含 `h3c lan_ports must be 1..16`（config_check 修复）和 `sampled flow`（PPE 误报修复）、
+出厂默认值（IP 10.1.1.1 / WiFi hanzi/hanziwawa）完整。
+
+下载地址（刷机用第一个 sysupgrade）：
+
+- https://github.com/likz0421/an7581-ci/releases/tag/v31
+- `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37.7 MB）← **sysupgrade 升级用**
+- `ponwrt-airoha-an7581-h3c_hm2004-du-initramfs-recovery.itb`（31.3 MB）← 救砖 recovery
+
+刷 v31 后：前端按 `lan_ports` 只显示 N 个下联端口/拓扑分支、拓扑图无 stale 提示、
+`unsupported section: h3c` 与 PPE counters 空闲误报均消失，**无需再 scp 前端 bundle、无需单独装 apk**。
+注意：刷机请选择「不保留配置」以应用出厂默认值；若保留配置，旧配置不会被覆盖（标记机制设计如此）。
+内核层 16 个 `fttrX` netdev 仍在（驱动未改，见下方驱动评估），但界面已按 N 收敛。
+
+---
+
+## 路径 ②：不重刷固件 — 一键脚本（离线自包含，大陆网络友好）
+
+适用于暂时不想刷 v31、只在当前 v30 上在线验证修复的场景。
 
 `fttr-oneclick.sh` 把三个前端 bundle 以 base64 **全部内嵌**，升级过程不访问 GitHub 或任何外网，
 只需 scp 这一个文件到设备即可完成检测、安装、状态查看和卸载回退：
@@ -18,7 +40,8 @@ sh /tmp/fttr-oneclick.sh status      # 查看三个 bundle 的安装版本与 md
 sh /tmp/fttr-oneclick.sh uninstall   # 从最近备份恢复，可随时回退
 ```
 
-后端 apk 编译完成后，把 apk 也 scp 到设备，用**同一个脚本**带参数安装（同样不访问外网）：
+后端修复已编进 v31 固件；若你暂时只想在旧版上补后端，可把 `openwrt-fttr-*.apk`
+scp 到设备，用**同一个脚本**带参数安装（同样不访问外网；单包编译不可行，见文末说明）：
 
 ```bash
 scp openwrt-fttr-*.apk root@10.1.1.1:/tmp/

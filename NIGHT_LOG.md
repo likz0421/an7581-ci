@@ -30,6 +30,21 @@
 - **结论：单包编译 = 半个固件编译，省不掉时间**。两个后端 bug（config_check h3c 误报、PPE 空闲提示）不影响功能（lan_ports 实际已生效）。经用户选择「改成全量固件编译」，触发 build-an7581.yml run=45704267034 编 v31，一步到位含前后端全部修复。后台 watch-full31.js 监控。
 - 诊断经验：OpenWrt kmod 依赖使单包编译必须 prepare 内核；Rust 包 host 自举是最大耗时；打包 apk 需 compile+install 两步。
 
+### 第 6 轮：v31 全量固件编译成功 + 二进制级验证（2026-11-26 早）
+- build-an7581.yml run=45704267034 **completed/success**，9 步全绿（含 Verify build outputs / Upload images / Create Release），耗时约 2h11m（21:25→23:37 UTC）。
+- Release `v31 HM2004-DU PonWrt` 已发布，2 个产物：
+  - `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37,708,032 B）← 升级用
+  - `ponwrt-airoha-an7581-h3c_hm2004-du-initramfs-recovery.itb`（31,326,208 B）
+- **二进制级验证（PySquashfsImage riter 解包 itb，hsqs@5808128）全部通过**：
+  1. 前端 3 bundle md5 与本地交付完全一致：config=6d4a369a… / index=5398934a… / topology=9cca77fb…；
+     index.js 含 lan_ports+端口限制；topology.js 含 tlt-tree/lan_ports/get_status，无 G6 实际调用。
+  2. fttrd(7.4MB) 含 `h3c lan_ports must be 1..16` 校验串 → config_check h3c 白名单修复已编入；
+     含 `sampled flow` 提示串 → PPE counters 空闲误报修复已编入；含 `lan_ports`/`h3c`。
+  3. `/etc/uci-defaults/10-hanzi-defaults` = 10.1.1.1/24 + DHCP .2/36h；`/etc/rc.local` 标记机制完整含
+     10.1.1.1 + WiFi ssid=hanzi / key=hanziwawa + `/etc/hanzi-defaults-applied` 标记。
+  4. `/etc/config/fttr` 含 h3c + lan_ports 说明。
+- 结论：v31 一步到位含前后端全部修复，用户刷机后无需再 scp 前端 bundle、无需 apk 单独升级。
+
 ### 第 4 轮：一键升级脚本 + 驱动改造评估（2026-11-25）
 - 用户问：硬编码 16 口重编固件能否改善、要不要动驱动；要求一键在线升级脚本（大陆环境改善、
   自动检测设备 OpenWrt、支持卸载/更新/检测/安装）。
