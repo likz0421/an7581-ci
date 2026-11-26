@@ -1,5 +1,43 @@
 # 2026-11-24 夜间/上午工作日志
 
+## 第 8 轮：动驱动编 2 个 fttr + 前端中文化 + SVG 拓扑 + v33（2026-11-26）
+用户刷 v31 后反馈：设 1 个 fttr 重启**真的生效**（br-lan 只剩 1 个，不是假的），但前端/设备页仍显示 16 个、
+拓扑图没大改、改端口数的设置是英文、前端还有 bug；明确要求"这版固件先编 2 个 fttr 进去"，
+"能修改硬编码 16 个 fttr 你做了吗"——即要**真的从驱动层减少 netdev**（不是隐藏）。
+
+### 关键澄清：用户之前看到的"没改"是有依据的
+- 二进制核对 v31 固件内 bundle = 第3轮旧版（config 6d4a369a / index 5398934a / topology 9cca77fb），
+  第7轮改动（index 4db5aee8）根本没进 v31（v31 在第7轮之前编的）。所以"前端没改"属实。
+
+### 根因再确认 + 驱动改造（安全方案）
+- 16 个 `fttrX` netdev 由内核驱动 `fmcs_netdevs_init()` 硬编码循环 `for i<16 register_netdev` 创建；
+  用户态删不掉，只能改驱动编译期数量。
+- **安全改法（不写 bug）**：`fmcs.h` 保留 `FMCS_MAX_FTTR_PORTS 16`（RX 路径 `fttr_devs[vlan_id-0x100]`
+  与 `omci_channel[16]` 按下标访问到 15，降容量会越界 oops），新增 `FMCS_ACTIVE_FTTR_PORTS 2`
+  仅用于创建循环；未创建槽位保持 NULL（priv 由 devm_kzalloc 清零，遍历均有 NULL 检查）。
+  未来改一个数字即可编 N 个（1..16），带编译期范围断言。
+- 后端对齐到 2：`runtime.rs configured_lan_ports` 默认/range 1..2；`templates.rs` h3c 校验 1..2；
+  `status.rs reported_switch_port_count` 硬件数=2（避免桥接/上报不存在的 fttr3..16 产生幽灵端口），单测同步。
+
+### 前端（真实一致性 + 中文 + 拓扑大改）
+- `index.js`/`topology.js` 删除各自读 UCI 猜测的 activePortLimit，直接信任后端 `switch_ports`（单一真相源）。
+- 中文化：basic.tsx 的 FTTR LAN port count/说明改中文含义，range 1-2、default 2；config.tsx 默认值 2；
+  `po/zh_Hans/fttr.po` 补 5 条翻译（之前缺失导致 fallback 英文，正是用户说的"设置是英文"）。
+- 拓扑图大改：从卡片列表改为**纯 SVG 分层拓扑**（OLT 根节点 → 贝塞尔曲线连线 → 各端口节点，
+  UP 绿色/DOWN 灰、状态徽标），零 G6/canvas/snapshot ubus，端口数=后端真实桥接数。
+- 注意：`npm test` 76 项中 2 项失败均为既有问题（topology.test 断言上游薄 SDK 页结构，第3轮重写后即不满足；
+  schema-codegen 是 Windows CRLF/LF 差异），与本轮改动无关；typecheck+build 通过。
+
+### 编译前验证（已做，不写 bug）
+- 驱动：括号配平、MAX 保持 16、ACTIVE=2、仅创建循环改、RX 数组访问未动、devm_kzalloc 零初始化确认。
+- 后端：括号配平、三处 1..2、测试同步。前端：typecheck+build 通过、产物无 uci.load/无 G6、含 SVG。
+- 一键脚本重建 md5 9b3f5ae5…（bundle config 98a240c2 / index 4db5aee8 / topology 8b66abbf），
+  端到端 install/status/uninstall 退出码全 0、md5 正确、卸载精确恢复。
+- 推送：后端 fork an7581-custom@a47b8c3；前端 main@5f280a4 / package@946bc3a（含中文 po）；
+  远端 bundle md5 与本地一致、po 含中文翻译。
+- 取消不含驱动的 v32（45734076836 cancelled）；触发 v33 run=45735310762，后台 watch-full33.js 监控。
+- 待 v33 成功：解包验证 fttr netdev 创建循环=2、bundle md5、中文 po/lmo、驱动符号。
+
 ## 第 3 轮：FTTR 端口数统一 + 拓扑图重做（2026-11-25，在线增量，不重刷固件）
 用户实测 v30：设 `lan_ports=1` 后 br-lan 确实只剩 1 个 fttr 口，但**前端下联端口仍画 16 张卡、
 拓扑图节点一大堆且报 stale/unavailable，网络→设备页仍 16 个 fttrX**。要求在线升级、不再全量编译。

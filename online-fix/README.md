@@ -1,32 +1,42 @@
 # FTTR 前后端修复 — 交付说明
 
-包含两条路径：**① v31 全量固件（前后端全部修复，推荐刷机）** 与 **② 在线增量升级包（不重刷固件）**。
+包含两条路径：**① v33 全量固件（驱动编 2 个 fttr + 全部修复，推荐刷机）** 与 **② 在线增量升级包（不重刷固件，仅前端）**。
 
 ---
 
-## 路径 ①：v31 全量固件（2026-11-26，前后端修复一步到位）
+## 路径 ①：v33 全量固件（2026-11-26，编译中）—— 真正解决"16 个 fttr"
 
-`build-an7581` run `45704267034` 编译成功（9 步全绿），Release `v31 HM2004-DU PonWrt` 已发布。
-**已做二进制级验证**：从 sysupgrade.itb 解包 squashfs 确认前端 3 个 bundle 的 md5 与交付版一致、
-fttrd 含 `h3c lan_ports must be 1..16`（config_check 修复）和 `sampled flow`（PPE 误报修复）、
-出厂默认值（IP 10.1.1.1 / WiFi hanzi/hanziwawa）完整。
+> v31/v32 都没有真正减少 fttr 接口：v31 前端 bundle 还是旧版，v32 不含驱动改动（已取消）。
+> **v33 是本轮按你要求重做的版本，编译完成后会替换这里。**
 
-下载地址（刷机用第一个 sysupgrade）：
+v33 包含你这一轮要求的全部改动：
 
-- https://github.com/likz0421/an7581-ci/releases/tag/v31
-- `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37.7 MB）← **sysupgrade 升级用**
-- `ponwrt-airoha-an7581-h3c_hm2004-du-initramfs-recovery.itb`（31.3 MB）← 救砖 recovery
+1. **驱动层真正只编 2 个 fttr  netdev**（不是隐藏）：`fmcs.h` 新增 `FMCS_ACTIVE_FTTR_PORTS=2`，
+   创建循环只注册 `fttr1`、`fttr2`；系统 `/sys/class/net` 里不再有 fttr3~fttr16。
+   保留 `FMCS_MAX_FTTR_PORTS=16` 作数组容量与协议上限（RX 路径按 GEM 0x100-0x10f 下标访问，
+   降容量会越界崩溃），未用槽位为 NULL 且所有访问有保护。以后想改成 N 个，只改这一个宏即可（1-16）。
+2. **后端对齐到 2**：桥接范围、配置校验、status 上报都限制为 1-2，与驱动一致，不再产生幽灵端口。
+3. **前端显示=真实**：下联端口/拓扑只信任后端 status 上报的实际桥接口数，不再各自读 UCI 猜测。
+4. **中文化**：FTTR LAN 端口数等设置项与说明已补中文翻译（之前缺翻译才显示英文）。
+5. **拓扑图大改**：改成纯 SVG 分层拓扑（OLT 根节点 → 连线 → 各端口节点，UP 绿色/DOWN 灰色），
+   去掉脆弱的 G6/snapshot ubus，端口数跟随真实桥接数。
 
-刷 v31 后：前端按 `lan_ports` 只显示 N 个下联端口/拓扑分支、拓扑图无 stale 提示、
-`unsupported section: h3c` 与 PPE counters 空闲误报均消失，**无需再 scp 前端 bundle、无需单独装 apk**。
-注意：刷机请选择「不保留配置」以应用出厂默认值；若保留配置，旧配置不会被覆盖（标记机制设计如此）。
-内核层 16 个 `fttrX` netdev 仍在（驱动未改，见下方驱动评估），但界面已按 N 收敛。
+编译前已做静态验证：驱动括号配平/范围断言/零初始化确认、后端三处 1-2 且测试同步、
+前端 typecheck+build 通过（产物无 uci.load、无 G6、含 SVG）、一键脚本端到端测试全绿。
+
+- 构建 run：`45735310762`（build-an7581），Release `v33` 编完后发布在此：
+  https://github.com/likz0421/an7581-ci/releases
+- 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`；
+  recovery 用 `...initramfs-recovery.itb`。刷机选「不保留配置」以应用默认 IP 10.1.1.1 / WiFi hanzi。
+
+v33 编完我会做二进制级验证（确认驱动只创建 2 个 fttr、bundle md5、中文翻译、后端 1-2 校验）后再给最终确认。
 
 ---
 
 ## 路径 ②：不重刷固件 — 一键脚本（离线自包含，大陆网络友好）
 
-适用于暂时不想刷 v31、只在当前 v30 上在线验证修复的场景。
+适用于暂时不想刷机、只在当前固件上在线看前端修复的场景。**注意：此路径改不了驱动**，
+系统里的 fttr3~fttr16 netdev 依旧存在，只有 v33 固件能从驱动层去掉。
 
 `fttr-oneclick.sh` 把三个前端 bundle 以 base64 **全部内嵌**，升级过程不访问 GitHub 或任何外网，
 只需 scp 这一个文件到设备即可完成检测、安装、状态查看和卸载回退：
@@ -40,7 +50,7 @@ sh /tmp/fttr-oneclick.sh status      # 查看三个 bundle 的安装版本与 md
 sh /tmp/fttr-oneclick.sh uninstall   # 从最近备份恢复，可随时回退
 ```
 
-后端修复已编进 v31 固件；若你暂时只想在旧版上补后端，可把 `openwrt-fttr-*.apk`
+后端修复已编进 v33 固件（v31/v32 不含）；若你暂时只想在旧版上补后端，可把 `openwrt-fttr-*.apk`
 scp 到设备，用**同一个脚本**带参数安装（同样不访问外网；单包编译不可行，见文末说明）：
 
 ```bash
@@ -54,7 +64,7 @@ sh /tmp/fttr-oneclick.sh all /tmp/openwrt-fttr-xxxx.apk
 - 覆盖前自动备份到 `/etc/fttr-oneclick/backup/<时间戳>/`；任一文件校验失败自动回滚。
 - 写入后逐文件 md5 校验，避免传输出错导致 LuCI 白屏。
 - `check` / `status` 完全只读，可先跑一遍确认设备现状。
-- 文件 md5：config `6d4a369a8fedeb3b173b90ad0baf52a6` / index `5398934a693818748da09e2e812a8aa7` / topology `9cca77fb93ec013c9eaa4fd38636235b`。
+- 文件 md5（本轮最终）：config `98a240c276241defdb6b4b8d1c2f3f5f` / index `4db5aee8ca5c2ea299f95e90c8376cf2` / topology `8b66abbf1da7cb17f15b1cbcc16c67df`；脚本 md5 `9b3f5ae5ab41e51cc6543ae77e006354`。
 
 下面的"方式 A / 方式 B"是手动等效步骤，供不想用脚本时参考。
 
