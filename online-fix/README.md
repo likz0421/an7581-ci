@@ -5,7 +5,15 @@
 > 若已刷 v33 起不来，应急回退 v31：
 > `https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`
 
-## ✅ 当前推荐刷机版本：v34（驱动编 2 个 fttr + 修复重启 BUG，已二进制验证）
+## ⏳ 当前状态：v37 编译中（含全部驱动修复），暂缓刷机
+
+> v34 虽修了 v33 的主崩溃循环，但深度复审又发现一处残留：`fmcs_lower_link` 失败回滚时
+> 哨兵仍按 16 遍历、会 unlink NULL（触发条件较窄：fttr0 绑定失败时）。已在 fork@a084243 修复，
+> v37（run 45806301710）编译中。**建议等 v37 编译完成、我做完反汇编验证后再刷。**
+> 急用可先刷 v31（稳定，但仍是 16 个 fttr）：
+> `https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`
+
+## v34（驱动编 2 个 fttr + 修复主重启 BUG，但有上述残留问题，非最终版）
 
 - Release：https://github.com/likz0421/an7581-ci/releases/tag/v34
 - 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37.7 MB），救砖用 `...initramfs-recovery.itb`。

@@ -284,3 +284,25 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - 缓存命中后加 "Refresh cached build stamps" 步骤：touch toolchain/host 的 stamp（排除 /target-），避免 OpenWrt 误判过期重编；target 包 stamp 不动以保证我们改的包仍重编。rustc-src 的 .prepared/.configured/.built 也 touch。
 - 不改 .config（不引入编译变数，尤其刚经历驱动 bug）。push 触发器自动触发 v35(run 45779447112) 首次生成缓存；预计从第二次构建起降到 15-25min。
 - 验证：yaml.safe_load 通过（10 步），v35 job 步骤确认缓存步骤 5/6 就位。缓存实际加速效果待 v35 之后的构建验证。
+
+### 第 9 轮附2：v35 缓存首建完成 + 构建耗时分析（2026-11-26 晚）
+- v35(run 45779447112) completed/success。缓存成功生成：5.46GB（free 账户 10GB 上限内），key `an7581-cache-v1-...-f6977f29`。
+- v35 步骤耗时：apt 装依赖 72min（异常）+ Clone 0 + Restore cache 0 + Refresh stamps skipped(首次无缓存) + Configure 1min + Build 96min(含首次建缓存) + Post 保存缓存 3min。
+- **apt 慢是偶发**：对比 v33 apt 仅 5min、v34 65min、v35 72min——是 `apt full-upgrade` 这两天触发大量 runner 系统包升级，与缓存无关。
+- **v34/v35 固件关键内容一致**：ko md5 均 f60379b8c893、topology.js 均 8b66abbf1da7；整包 md5 不同仅构建时间戳。刷 v34 即可。
+- Build 步骤：v33=86min、v34=88min(无缓存)；v35=96min(首次建缓存)。缓存加速效果待 v36 命中验证（apt 慢问题另计）。
+- 待办：触发 v36 验证缓存命中后 Build 是否降到 ~15-25min；考虑去掉 apt full-upgrade 或换稳定源以避免 65-72min 偶发慢。
+
+### 第 9 轮附4：v34 深度复审又发现一处残留 bug → v37（2026-11-26 晚）
+用户问"确定 bug 都修好了？"。因 v33 教训（我曾误判"全安全"），这次做彻底复审：
+- 系统化扫描最终版全部 25 个 fttr_devs 访问点 + 4 个 omci_channel 访问点，逐个核对循环上界与 NULL 保护。
+- **又发现一处真实残留 bug**：`fmcs_lower_link()` 的失败回滚——`dev_set_mtu` 或 `netdev_rx_handler_register` 失败时设 `i = FMCS_MAX_FTTR_PORTS`(16)，rollback `while(--i>=0)` 无 NULL 检查地 `netdev_upper_dev_unlink(lower, fttr_devs[i])`，遍历到 NULL 槽位 2..15 → 同类空指针崩溃。触发条件较窄（fttr0 lower 绑定失败）但真实存在。
+- 修复(fork@a084243)：L296/L305/L1001 三处回滚哨兵 `i = FMCS_MAX_FTTR_PORTS` → `FMCS_ACTIVE_FTTR_PORTS`。
+- omci_channel 索引复审安全：netdev.c onu_id<=15 守卫、vlan_id 0x100-0x10f、main.c op.addr>15 守卫。
+- 触发 v37(run 45806301710) 重编，watch-full37.js(grxMD5)。
+- **v36 缓存命中已验证**：步骤5 Restore cache=success、步骤6 Refresh stamps=success(非skipped) → 缓存机制工作正常；v36 继续编以提供加速数据。
+
+### 回答"确定修好了吗"的诚实结论
+- 静态+反汇编层面：v34 修复了 v33 的 7 处崩溃循环；但复审发现 rollback 哨兵残留（已修，待 v37 验证）。
+- **无法真机验证**：我没有设备，只能做源码审计+反汇编+行为模拟。最终需用户刷机实测确认。
+- 教训重申：这类底层驱动的彻底验证必须遍历所有索引访问点 + 所有失败回滚路径，不能只看主路径。
