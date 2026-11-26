@@ -1,12 +1,20 @@
 # FTTR 前后端修复 — 交付说明
 
 > ⚠️ **v33 有 BUG：无限重启，请勿使用。** 根因是驱动改造时只改了端口创建循环，漏改了 7 处仍遍历 16 槽位的循环，
-> 导致绑定 br-lan 时空指针内核 panic。**已修复并重编 v34（编译中）**。
->
-> **应急回退**：刷回 v31（可正常启动）：
+> 导致绑定 br-lan 时空指针内核 panic。**已修复，用 v34（下方）。**
+> 若已刷 v33 起不来，应急回退 v31：
 > `https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`
 
-包含两条路径：**① v34 全量固件（驱动编 2 个 fttr + 全部修复 + 修复重启 BUG，编译中）** 与 **② 在线增量升级包（不重刷固件，仅前端）**。
+## ✅ 当前推荐刷机版本：v34（驱动编 2 个 fttr + 修复重启 BUG，已二进制验证）
+
+- Release：https://github.com/likz0421/an7581-ci/releases/tag/v34
+- 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37.7 MB），救砖用 `...initramfs-recovery.itb`。
+- **验证**：19/19 二进制检查通过；反汇编确认驱动只创建 2 个 fttr（`cmp w27,#2`），
+  且 7 处崩溃循环的 16 上界已消除、`bridge_pair_enabled`/`bridge_port_enabled` 有范围+NULL 守卫。
+- 刷机选「不保留配置」以应用默认 IP 10.1.1.1 / WiFi `hanzi`。以后改端口数改 `FMCS_ACTIVE_FTTR_PORTS` 宏重编即可。
+- 注：v35 是同类固件（只是 CI 首次建缓存），功能与 v34 相同，刷 v34 即可。
+
+包含两条路径：**① v34 全量固件（推荐）** 与 **② 在线增量升级包（不重刷固件，仅前端）**。
 
 ---
 

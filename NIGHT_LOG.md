@@ -67,6 +67,16 @@
 - 验证：`simulate-driver-fix.py` 确认 9 处循环全用 ACTIVE、无 NULL 解引用、pair_enabled 拒绝无效端口。
 - 触发 v34 run=45775418280 重编，后台 watch-full34.js(bwADWO)。
 
+### v34 编译成功 + 二进制级验证（2026-11-26 晚）
+- run=45775418280 completed/success，Release v34 发布 2 itb（sysupgrade 37,708,032B）。
+- `.prep/verify-v34-fw.py` 19/19 全通过（bundle md5/中文 lmo/fttrd 1..2 校验/默认值等，同 v33）。
+- **反汇编铁证（修复确认）**：提取 v34 h3c-fmcs.ko 反汇编——
+  - `fmcs_netdevs_init` 边界 `cmp w27, #2`（只建 2 个端口）。
+  - `fmcs_bridge_pair_enabled`@0x3320 开头 `cmp w1,#1`+`cmp w2,#1`(范围守卫)+`cmp x5,#0`(NULL检查) → 崩溃点已修。
+  - `fmcs_bridge_port_enabled`@0x3144 `cmp w1,#1` → 范围守卫在。
+  - 全 ko `cmp #16` 从 v33 的 7 处降到 4 处（残留 4 处在 probe/SPI 非端口遍历循环），7 处崩溃循环的 16 上界已消除。
+- 结论：v34 为可刷机修复版（同时含缓存 workflow 之外，固件内容与 v33 修复目标一致但修了重启）。v35 是带缓存 workflow 的构建。
+
 ### 用户应急回退
 - v31（可正常启动）sysupgrade：https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb
 - **教训**：改数组填充数量时，必须逐个 audit 所有按原容量遍历的循环；"下标不越界"≠"无 NULL 解引用"。
