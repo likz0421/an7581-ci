@@ -61,6 +61,44 @@ jobs:
             git checkout "$REF"
           fi
           git log -1 --oneline
+          # Cache key discriminator: PonWrt commit, so a toolchain change invalidates the cache.
+          echo "PONWRT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Restore build cache (toolchain / Rust / downloads / ccache)
+        id: buildcache
+        uses: actions/cache@v4
+        with:
+          # Free accounts: 10 GB total. These paths compress well and stay under the cap.
+          # Do NOT cache build_dir broadly (Rust bootstrap tree alone is 3-5 GB); only the
+          # specific host/rustc src dir that carries the 88-minute bootstrap result.
+          path: |
+            ponwrt/dl
+            ponwrt/staging_dir
+            ponwrt/build_dir/target-aarch64_cortex-a53_musl/host/rustc-1.96.1-src
+            ~/.ccache
+          key: an7581-cache-v1-${{ hashFiles('scripts/configure.sh', '.config.additions', '.config.fttr') }}-${{ env.PONWRT_SHA }}
+          restore-keys: |
+            an7581-cache-v1-${{ hashFiles('scripts/configure.sh', '.config.additions', '.config.fttr') }}-
+            an7581-cache-v1-
+
+      - name: Refresh cached build stamps
+        if: steps.buildcache.outputs.cache-hit == 'true'
+        run: |
+          # OpenWrt tracks build stages by stamp mtimes. Cached stamps can be older than
+          # the restored objects, which would trigger a full rebuild. Touch toolchain and
+          # host-tool stamps; leave target/* stamps alone so our changed packages still rebuild.
+          echo "=== refreshing cached toolchain/host stamps ==="
+          n=0
+          while IFS= read -r d; do
+            find "$d" -type f -exec touch {} + 2>/dev/null || true
+            n=$((n+1))
+          done < <(find ponwrt/staging_dir -type d -name stamp 2>/dev/null | grep -v '/target-' || true)
+          echo "  refreshed $n stamp dirs"
+          # Rust host bootstrap stamp (prepared/configured/built) must look current too.
+          find ponwrt/build_dir/target-aarch64_cortex-a53_musl/host/rustc-1.96.1-src \
+            -maxdepth 1 -type f -name '.prepared*' -o -name '.configured' -o -name '.built' 2>/dev/null \
+            | xargs -r touch 2>/dev/null || true
+          echo "=== cache stamp refresh done ==="
 
       - name: Configure feeds and packages
         run: |
