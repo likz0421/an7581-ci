@@ -344,3 +344,18 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - 中文翻译补齐（pon.po +20 条），msgid/msgstr 配平。
 - 全量语法验证通过：6 个 JS (node --check 包装后)、2 个 JSON、PO 配平。
 - **未推送**：v39 正在 Build，等其验证通过（bridge 修复+主题）后再推送触发 v40，避免污染 v39。
+
+### 第 10 轮续：PON 后端 C/Rust 改造 + 真在线更新（2026-11-27）
+用户质疑"为啥不碰 C、不专业"——纠正：ponctl 其实是 **Rust**（airoha-ponctl/src/src/{main,status,netlink}.rs），不是 C。已实际改造并通过本地 cargo 验证。
+- **后端 Rust 增强**（fork@ce464e5）：
+  - `status.rs` 新增 `aggregate_json(version, lines)` 生成 v2 批量状态文档（内联保持 v1 结构）；`quoted` 公开为 `json_quote`。
+  - `main.rs` 新增 `ponctl status --all --json`（一次拿所有 PON 线状态，带 schema_version=2 + ponctl_version）和 `ponctl version --json`（供在线更新判断版本）；help 同步。
+  - **本地 verification**：装 rustup 1.100.0，`cargo check` 通过；`cargo test` 3/3 通过（含新增 aggregate_json 测试）。注意 Windows 中文路径会让 mingw linker 失败，需复制到 /tmp 英文路径跑 test。
+- **真在线更新**（update.js，替代之前本地版）：
+  - 显示 installed version（`ponctl version --json`）vs GitHub releases/latest（`busybox wget -q -O -`）。
+  - 下载最新 luci-app-pon apk → sha256sum → 双重确认 → `apk add --allow-untrusted`。
+  - 更新源可经 UCI `pon.update.release_url` 配置（默认 likz0421/openwrt-pon-userspace releases）；带本地 apk fallback。
+  - ACL 加 ponctl version/busybox wget/sha256sum/apk add 权限；menu 加"Online update"入口。
+- **清理**：移除 diagnostics.js 里重复的本地更新 section（修掉删除时多留的 `])` 语法错误）。
+- **验证**：7 个 JS node --check 通过、2 个 JSON 合法、PO 配平、远端 fork blob md5 与本地一致、cargo test 3/3。
+- **configure.sh 本地已改**（未推，避免污染 v39）：pon_userspace feed 指向 likz0421 fork。v39(run 45911941564) 仍在 Build，待其验证通过后推送并触发 v40。
