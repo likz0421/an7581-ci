@@ -44,3 +44,9 @@ CONFIG_BUSYBOX_CONFIG_DEVMEM=y
 # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geoview is not set
 # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin is not set
 # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray is not set
+
+# --- 主题：移除 argon，改用 anothaDev/luci-theme-vantage ---
+# 默认 PonWrt config 选中 argon + bootstrap；vantage 用 ucode 模板（与当前 LuCI 同构），
+# configure.sh 会把 vantage 包拷进 package/。保留 bootstrap 作为 fallback。
+# CONFIG_PACKAGE_luci-theme-argon is not set
+CONFIG_PACKAGE_luci-theme-vantage=y

@@ -113,6 +113,14 @@ if [ ! -d package/luci-app-airoha-npu ]; then
   rm -rf /tmp/luci-app-airoha-npu-src
   echo "[npu] luci-app-airoha-npu (DenzelVincent v1.3.1) staged into package/"
 fi
+# 主题：用 anothaDev/luci-theme-vantage 替换默认的 argon。
+# 仓库内包目录为 luci-theme-vantage/（Makefile + htdocs + ucode + po + root），ucode 模板与当前 LuCI 同构。
+if [ ! -d package/luci-theme-vantage ]; then
+  git clone --depth=1 https://github.com/anothaDev/luci-theme-vantage.git /tmp/luci-theme-vantage-src
+  cp -r /tmp/luci-theme-vantage-src/luci-theme-vantage package/luci-theme-vantage
+  rm -rf /tmp/luci-theme-vantage-src
+  echo "[theme] luci-theme-vantage staged into package/"
+fi
 # 本地包依赖修正：luci-app-fttr 依赖 openwrt-fttr（Package 定义名，正确）无需改；
 # 打印确认 fttr 包确实可被扫到
 echo "[feeds] fttr feed package dirs:"
@@ -167,7 +175,7 @@ if ! grep -qE '^CONFIG_TARGET_DEVICE_airoha_an7581_DEVICE_h3c_hm2004-du=y$' .con
   echo "[configure] ERROR: h3c_hm2004-du device not selected in .config"; exit 1
 fi
 # 关键校验 2：必须选中的软件包，defconfig 静默丢弃任何一项都说明 feed/布局有问题，直接失败
-REQ_PKGS="CONFIG_PACKAGE_honk CONFIG_PACKAGE_luci-app-honk CONFIG_PACKAGE_luci-app-airoha-npu CONFIG_PACKAGE_luci-app-pon"
+REQ_PKGS="CONFIG_PACKAGE_honk CONFIG_PACKAGE_luci-app-honk CONFIG_PACKAGE_luci-app-airoha-npu CONFIG_PACKAGE_luci-app-pon CONFIG_PACKAGE_luci-theme-vantage"
 if [ "$WITH_FTTR" = "true" ]; then
   REQ_PKGS="$REQ_PKGS CONFIG_PACKAGE_openwrt-fttr CONFIG_PACKAGE_kmod-h3c-fmcs CONFIG_PACKAGE_h3c-fmcs-firmware CONFIG_PACKAGE_luci-app-fttr"
 fi
