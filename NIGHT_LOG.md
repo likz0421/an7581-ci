@@ -44,6 +44,33 @@
 - 环境：无 objdump，用 `python3 -m pip install capstone pyelftools` 反汇编验证 ko 立即数。
 - 最终交付：用户刷 v33（Release tag v33）即物理只剩 2 个 fttr；以后改 `FMCS_ACTIVE_FTTR_PORTS` 宏可编任意 1-16 个。文档推送 @8e954bb8。
 
+## 第 9 轮：v33 无限重启 BUG 定位与修复 → v34（2026-11-26 下午）
+用户刷 v33 后**无限重启**。立即审计驱动源码，定位到我第8轮改造引入的严重 bug：
+
+### 根因（我的 bug，如实记录）
+- 第8轮只把"创建 netdev 循环"上限改成 `FMCS_ACTIVE_FTTR_PORTS=2`，但仍有 7 处"遍历端口做操作"
+  的循环沿用 `FMCS_MAX_FTTR_PORTS=16` 且**无 NULL 检查**。这些槽位 2..15 是 NULL：
+  - `fmcs_lower_link()` L270 `netdev_upper_dev_link(lower, NULL, NULL)` ← 开机绑定 br-lan 必崩
+  - L276 `port->mtu`（port=NULL）解引用崩溃
+  - `fmcs_lower_unlink()` L258 `netdev_upper_dev_unlink(lower, NULL)`
+  - PRECHANGEMTU L328 `priv->fttr_devs[i]->mtu` 解引用 NULL
+  - rollback L300 同上
+- 结果：fttrd 一启动把 br-lan 绑定到 fmcs lower → 内核空指针 panic → 无限重启。
+- **我第8轮的错误判断**：当时声称"未用槽位 NULL 且所有访问有保护"——错。只有 cleanup/notifier 几处
+  有 `if(dev)`，关键的 bridge link/mtu 循环没有。行为模拟脚本也只验了"下标不越界"，没验"NULL 解引用"。
+
+### 修复（fork@c1950a3）
+- 把全部 9 处端口操作循环上界统一从 `FMCS_MAX_FTTR_PORTS` 改为 `FMCS_ACTIVE_FTTR_PORTS`，
+  保证只遍历已创建的端口（非 NULL）。
+- `fmcs_bridge_pair_enabled()` / `fmcs_bridge_port_enabled()` 加 src/port 范围守卫 + NULL 检查。
+- 错误路径哨兵 `i = FMCS_MAX_FTTR_PORTS` 保留（回滚时多遍历 NULL 槽位有 `if` 保护，安全）。
+- 验证：`simulate-driver-fix.py` 确认 9 处循环全用 ACTIVE、无 NULL 解引用、pair_enabled 拒绝无效端口。
+- 触发 v34 run=45775418280 重编，后台 watch-full34.js(bwADWO)。
+
+### 用户应急回退
+- v31（可正常启动）sysupgrade：https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb
+- **教训**：改数组填充数量时，必须逐个 audit 所有按原容量遍历的循环；"下标不越界"≠"无 NULL 解引用"。
+
 ## 第 3 轮：FTTR 端口数统一 + 拓扑图重做（2026-11-25，在线增量，不重刷固件）
 用户实测 v30：设 `lan_ports=1` 后 br-lan 确实只剩 1 个 fttr 口，但**前端下联端口仍画 16 张卡、
 拓扑图节点一大堆且报 stale/unavailable，网络→设备页仍 16 个 fttrX**。要求在线升级、不再全量编译。
