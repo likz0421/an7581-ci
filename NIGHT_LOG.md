@@ -306,3 +306,11 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - 静态+反汇编层面：v34 修复了 v33 的 7 处崩溃循环；但复审发现 rollback 哨兵残留（已修，待 v37 验证）。
 - **无法真机验证**：我没有设备，只能做源码审计+反汇编+行为模拟。最终需用户刷机实测确认。
 - 教训重申：这类底层驱动的彻底验证必须遍历所有索引访问点 + 所有失败回滚路径，不能只看主路径。
+
+### 第 9 轮最终：v37 编译成功 + 反汇编/二进制验证全通过（2026-11-26 晚）
+- v37(run 45806301710) completed/success，Release v37 发布：sysupgrade 38,039,808B(id 795762262) + recovery 31,588,352B。
+- **缓存加速实测生效**：apt 72min→1min(去full-upgrade)、Build 96min→75min(缓存命中)、总 ~2h50m→~1h20m。Restore cache=success、Refresh stamps=success。
+- **验证全通过**：`verify-v37-ko.py` 反汇编 5/5（创建循环 cmp#2、pair/port_enabled 范围+NULL守卫、cmp#16 从7降到4）；`verify-v37-fw.py` 19/19（bundle md5/中文lmo/fttrd 1..2/默认值）。
+- **v37 含回滚哨兵修复的证据链**：fork HEAD=a084243(10:58:30Z)、v37 Configure 步骤 11:04 拉 an7581-custom(晚于commit)、v37 ko 59520B≠v34 59632B(源码改动生效)、v37 event区多 mov x19,#1。
+- 结论：v37 为最终可刷机版（含全部已知驱动修复）。但真机启动仍无法本地验证，需用户刷机确认。
+- README 改为推荐 v37。

@@ -1,19 +1,19 @@
 # FTTR 前后端修复 — 交付说明
 
-> ⚠️ **v33 有 BUG：无限重启，请勿使用。** 根因是驱动改造时只改了端口创建循环，漏改了 7 处仍遍历 16 槽位的循环，
-> 导致绑定 br-lan 时空指针内核 panic。**已修复，用 v34（下方）。**
-> 若已刷 v33 起不来，应急回退 v31：
+> ⚠️ 历史：v33 无限重启（漏改 7 处遍历循环）、v34 仍有 1 处残留（`fmcs_lower_link` 失败回滚哨兵）。
+> **两者都不要刷。用下面的 v37。** 若设备起不来，应急回退 v31：
 > `https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`
 
-## ⏳ 当前状态：v37 编译中（含全部驱动修复），暂缓刷机
+## ✅ 当前推荐刷机版本：v37（全部已知驱动修复，已编译 + 验证通过）
 
-> v34 虽修了 v33 的主崩溃循环，但深度复审又发现一处残留：`fmcs_lower_link` 失败回滚时
-> 哨兵仍按 16 遍历、会 unlink NULL（触发条件较窄：fttr0 绑定失败时）。已在 fork@a084243 修复，
-> v37（run 45806301710）编译中。**建议等 v37 编译完成、我做完反汇编验证后再刷。**
-> 急用可先刷 v31（稳定，但仍是 16 个 fttr）：
-> `https://github.com/likz0421/an7581-ci/releases/download/v31/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`
+- Release：https://github.com/likz0421/an7581-ci/releases/tag/v37
+- 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（38.0 MB），救砖用 `...initramfs-recovery.itb`。
+- **验证**：反汇编 5/5（创建循环只建 2 个端口、范围+NULL 守卫齐全、cmp #16 从 7 降到 4）+ 二进制 19/19 全通过。
+- 修复证据：fork HEAD=`a084243`，v37 的 Configure 步骤在其后拉取，ko 产物与 v34 不同（源码改动生效）。
+- **注意**：以上为静态/反汇编验证，真机启动仍需你刷机实测确认。
+- 缓存加速已生效：本轮编译从 ~2h50m 降到 ~1h20m。
 
-## v34（驱动编 2 个 fttr + 修复主重启 BUG，但有上述残留问题，非最终版）
+## v34（旧版，有回滚哨兵残留问题，勿刷）
 
 - Release：https://github.com/likz0421/an7581-ci/releases/tag/v34
 - 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37.7 MB），救砖用 `...initramfs-recovery.itb`。
