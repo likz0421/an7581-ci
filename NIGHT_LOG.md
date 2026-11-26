@@ -35,8 +35,14 @@
   端到端 install/status/uninstall 退出码全 0、md5 正确、卸载精确恢复。
 - 推送：后端 fork an7581-custom@a47b8c3；前端 main@5f280a4 / package@946bc3a（含中文 po）；
   远端 bundle md5 与本地一致、po 含中文翻译。
-- 取消不含驱动的 v32（45734076836 cancelled）；触发 v33 run=45735310762，后台 watch-full33.js 监控。
-- 待 v33 成功：解包验证 fttr netdev 创建循环=2、bundle md5、中文 po/lmo、驱动符号。
+- 取消不含驱动的 v32(45734076836 cancelled)；触发 v33 run=45735310762，后台 watch-full33.js 监控。
+
+### 第 8 轮收尾：v33 编译成功 + 二进制级验证 19/19（2026-11-26 下午）
+- run=45735310762 completed/success（9 步全绿），Release `v33` 发布 2 itb。
+- `.prep/verify-v33-fw.py` 从 sysupgrade.itb 解包验证 19/19 全通过：前端 3 bundle md5 一致(config 98a240c2/index 4db5aee8/topology 8b66abbf)、topology 含 SVG 无 G6/uci.load、中文 lmo 含"局域网端口数量"、fttrd 含 `h3c lan_ports must be 1..2`+sampled flow、默认值完整。
+- **驱动反汇编铁证**：`h3c-fmcs.ko`(ELF64 AArch64) symtab 找 `fmcs_netdevs_init`@0x3920，capstone 反汇编得循环边界 `0x3e04: cmp w27, #2` + `b.ne 0x3b4c` → **只创建 fttr1/fttr2**，物理无 fttr3~16；数组容量仍16、RX 零越界。
+- 环境：无 objdump，用 `python3 -m pip install capstone pyelftools` 反汇编验证 ko 立即数。
+- 最终交付：用户刷 v33（Release tag v33）即物理只剩 2 个 fttr；以后改 `FMCS_ACTIVE_FTTR_PORTS` 宏可编任意 1-16 个。文档推送 @8e954bb8。
 
 ## 第 3 轮：FTTR 端口数统一 + 拓扑图重做（2026-11-25，在线增量，不重刷固件）
 用户实测 v30：设 `lan_ports=1` 后 br-lan 确实只剩 1 个 fttr 口，但**前端下联端口仍画 16 张卡、
