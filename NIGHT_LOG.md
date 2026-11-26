@@ -266,3 +266,11 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 
 ## 已知上游问题（非本仓库能解决）
 - OLT 下行光口散热（需风扇），NPU 卸载引擎挂载问题（上游 PR 已修部分）
+
+### 第 9 轮附：CI 编译缓存优化（2026-11-26 下午）
+用户问"编译为何慢/要不要加缓存"。诊断：当前 workflow 零缓存（只装 ccache 包但没开 CONFIG_CCACHE、没持久化），每轮从零编：toolchain ~35min + Rust 自举 ~88min（最大头）+ 包编译 ~20min ≈ 2h。
+- 账户 free plan，GitHub Actions 缓存上限 10GB。
+- 方案（an7581-ci@6d2ec91）：workflow 在 Clone PonWrt 后加 `actions/cache@v4`，缓存路径 = `ponwrt/dl` + `ponwrt/staging_dir` + `ponwrt/build_dir/target-aarch64_cortex-a53_musl/host/rustc-1.96.1-src`（只这一个 build_dir 子目录，保住 88min rust 自举产物）+ `~/.ccache`；key = `an7581-cache-v1-<hashFiles(configure.sh/.config.additions/.config.fttr)>-<PONWRT_SHA>`，restore-keys 两级回退。
+- 缓存命中后加 "Refresh cached build stamps" 步骤：touch toolchain/host 的 stamp（排除 /target-），避免 OpenWrt 误判过期重编；target 包 stamp 不动以保证我们改的包仍重编。rustc-src 的 .prepared/.configured/.built 也 touch。
+- 不改 .config（不引入编译变数，尤其刚经历驱动 bug）。push 触发器自动触发 v35(run 45779447112) 首次生成缓存；预计从第二次构建起降到 15-25min。
+- 验证：yaml.safe_load 通过（10 步），v35 job 步骤确认缓存步骤 5/6 就位。缓存实际加速效果待 v35 之后的构建验证。
