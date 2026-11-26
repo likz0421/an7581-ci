@@ -4,10 +4,10 @@
 
 ---
 
-## 路径 ①：v33 全量固件（2026-11-26，编译中）—— 真正解决"16 个 fttr"
+## 路径 ①：v33 全量固件（2026-11-26，✅ 编译成功 + 二进制验证 19/19 通过）—— 真正解决"16 个 fttr"
 
 > v31/v32 都没有真正减少 fttr 接口：v31 前端 bundle 还是旧版，v32 不含驱动改动（已取消）。
-> **v33 是本轮按你要求重做的版本，编译完成后会替换这里。**
+> **v33 是本轮按你要求重做的版本，已编译成功并完成二进制级验证。**
 
 v33 包含你这一轮要求的全部改动：
 
@@ -24,12 +24,26 @@ v33 包含你这一轮要求的全部改动：
 编译前已做静态验证：驱动括号配平/范围断言/零初始化确认、后端三处 1-2 且测试同步、
 前端 typecheck+build 通过（产物无 uci.load、无 G6、含 SVG）、一键脚本端到端测试全绿。
 
-- 构建 run：`45735310762`（build-an7581），Release `v33` 编完后发布在此：
-  https://github.com/likz0421/an7581-ci/releases
-- 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`；
-  recovery 用 `...initramfs-recovery.itb`。刷机选「不保留配置」以应用默认 IP 10.1.1.1 / WiFi hanzi。
+### ✅ 二进制级验证结果（从 sysupgrade.itb 解包实测，19/19 通过）
 
-v33 编完我会做二进制级验证（确认驱动只创建 2 个 fttr、bundle md5、中文翻译、后端 1-2 校验）后再给最终确认。
+- **前端 3 个 bundle md5 与交付版完全一致**：config `98a240c2` / index `4db5aee8` / topology `8b66abbf`；
+  topology.js 含 `createElementNS`/`tlt-svg`、无 G6、无 `uci.load("fttr")`。
+- **中文 lmo 已生成**：`/usr/lib/lua/luci/i18n/fttr.zh-cn.lmo` 含"局域网端口数量""下联端口"。
+- **后端 fttrd**：含 `h3c lan_ports must be 1..2`（不再是 1..16）、含 `sampled flow` PPE 修复。
+- **出厂默认值**：10.1.1.1 / WiFi hanzi/hanziwawa / 首启标记完整。
+- **驱动反汇编铁证**：反汇编 `h3c-fmcs.ko` 的 `fmcs_netdevs_init`（0x3920），
+  创建循环边界是 `0x3e04: cmp w27, #2` + `0x3e08: b.ne 0x3b4c`——
+  **即循环只跑 i=0,1，只创建 fttr1、fttr2**，物理上不存在 fttr3~fttr16。
+  （数组容量与协议上限仍为 16，RX 路径零越界；`fttr%d` 格式串在 `.rodata.str1.8`。）
+
+### 刷机
+
+- Release：https://github.com/likz0421/an7581-ci/releases/tag/v33
+- 构建 run：`45735310762`（build-an7581，全部 9 步 success）
+- 刷机用 `ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb`（37.7 MB）；
+  救砖用 `...initramfs-recovery.itb`（31.3 MB）。
+- 刷机选「不保留配置」以应用默认 IP 10.1.1.1 / WiFi `hanzi` / 密码 `hanziwawa`。
+- 以后想把端口数改成别的值：改 `fmcs.h` 的 `FMCS_ACTIVE_FTTR_PORTS`（1-16）重编即可。
 
 ---
 
