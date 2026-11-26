@@ -333,3 +333,14 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - 取消不含 bridge 修复的 v38(45911254282)，触发 v39(run 45911941564) 含 bridge 修复+主题，watch-full39.js(TcB8hx)。
 - 教训：改驱动减少 netdev 数量时，后端所有按平台资源表(16口)遍历并操作 netdev 的地方都必须加存在性检查，
   否则 ENODEV 会让守护进程启动失败。setup_bridge() 与 setup_bridge_limited() 是两个不同函数，别只改一个。
+
+### 第 10 轮附：PON 插件前后端加强（本地完成，待 v39 验证后推送 → v40）
+用户要求：FTTR 上游没修的 bug 我们修；PON 前端过于简陋要改造美化、后端功能加强、在线更新、导入导出配置。用户全选四项，选择 fork PON 插件本地 bundle 覆盖方案。
+- fork `likz0421/openwrt-pon-userspace`（从 DenzelVincent fork，125 files），本地 pon-dev/ 建立基线。
+- **配置导入导出**：新增 `backup.js` 独立视图（uci export pon + Blob 下载；导入 ui.uploadFile + 格式校验 + 自动备份到 /tmp/pon-config-backup + uci import + 恢复按钮）；menu.d 加"Backup / Restore"入口；ACL 加 /sbin/uci export/import + 临时文件权限。
+- **前端美化+仪表盘**：status.js 加状态仪表盘（每 PON line 一张卡片：模式/链路状态色/接收光功率/光信号/服务就绪），内联 CSS 零外部依赖，轮询同步更新；保留原详细表格。
+- **后端功能加强**（零 C 改动避免硬件风险）：diagnostics.js 加"导出状态 JSON"（遍历所有 line 的 ponctl status --json 打包下载）。
+- **在线更新（受限安全版）**：diagnostics.js 加"更新 PON 插件（实验性）"——只接受本地上传文件名含 luci-app-pon 的 .apk，双重确认，无远程拉取，apk add 安装；ACL 加 apk exec 权限。
+- 中文翻译补齐（pon.po +20 条），msgid/msgstr 配平。
+- 全量语法验证通过：6 个 JS (node --check 包装后)、2 个 JSON、PO 配平。
+- **未推送**：v39 正在 Build，等其验证通过（bridge 修复+主题）后再推送触发 v40，避免污染 v39。
