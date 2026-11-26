@@ -314,3 +314,22 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - **v37 含回滚哨兵修复的证据链**：fork HEAD=a084243(10:58:30Z)、v37 Configure 步骤 11:04 拉 an7581-custom(晚于commit)、v37 ko 59520B≠v34 59632B(源码改动生效)、v37 event区多 mov x19,#1。
 - 结论：v37 为最终可刷机版（含全部已知驱动修复）。但真机启动仍无法本地验证，需用户刷机确认。
 - README 改为推荐 v37。
+
+### 第 10 轮：真机日志定位 fttrd "Object not found" 根因 → v39（2026-11-27）
+用户刷 v37 后 FTTR 前端报 `RPC call to fttr/get_status failed -32000 Object not found`。拿真机 SSH 日志定位：
+- `ps` 无 fttrd 进程、ubus list 无 fttr 对象、`/etc/init.d/fttr status` = not running(5)。
+- 手动跑 fttrd **能成功注册 ubus 'fttr'**，但日志刷 `Cannot find device "fttr3".."fttr16"`，最后：
+  `[-] NPU admission paused: Cannot find device "fttr16"`
+  `[-] Hardware initialization failed; requesting supervised restart: No such device (os error 19)`
+- **根因**：v37 后端 `setup_bridge()`（非 limited）对 16 个 fttr 口无条件 `ip link set up/master br-lan`，
+  但驱动只创建 fttr1/fttr2（我改的 2 端口），fttr3..16 不存在 → ip 返回 ENODEV → `?` 传播 →
+  restore_optical_state 硬件初始化失败 → fttrd 退出/procd respawn throttle → ubus 对象消失。
+- **修复**(fork@e9faf27)：`network.rs` 的 `setup_bridge()` 和 `setup_bridge_limited()` 都加
+  `interface_present()` 检查（/sys/class/net/<if> 存在才操作），不存在的口跳过；management_interfaces
+  也改 best-effort。
+- 用户澄清"DHCP 没下发"是连了**子猫的 hanzi WiFi**的误判，主路由 DHCP 正常。
+- 主题：用户重申要移除 argon、用 vantage。已在 configure.sh clone vantage 包 + .config.additions
+  关 argon 开 vantage + REQ_PKGS 校验，推送 @3e8900a。
+- 取消不含 bridge 修复的 v38(45911254282)，触发 v39(run 45911941564) 含 bridge 修复+主题，watch-full39.js(TcB8hx)。
+- 教训：改驱动减少 netdev 数量时，后端所有按平台资源表(16口)遍历并操作 netdev 的地方都必须加存在性检查，
+  否则 ENODEV 会让守护进程启动失败。setup_bridge() 与 setup_bridge_limited() 是两个不同函数，别只改一个。
