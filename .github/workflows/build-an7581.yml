@@ -207,6 +207,13 @@ jobs:
           name: an7581-run-${{ github.run_number }}
           path: ponwrt/bin/targets/airoha/an7581/
           retention-days: 30
+      - name: Collect PON apk for release
+        if: success()
+        run: |
+          mkdir -p release-assets
+          find ponwrt/bin -type f -name 'luci-app-pon*.apk' -exec cp -f {} release-assets/ \; 2>/dev/null || true
+          echo "=== collected PON apks ==="
+          ls -la release-assets/ || true
       - name: Create Release
         if: success()
         uses: softprops/action-gh-release@v2
@@ -223,8 +230,7 @@ jobs:
           files: |
             ponwrt/bin/targets/airoha/an7581/**/*.itb
             ponwrt/bin/targets/airoha/an7581/**/*.bin
-            ponwrt/bin/targets/airoha/an7581/packages/luci-app-pon*.apk
-            ponwrt/bin/packages/*/luci-app-pon*.apk
+            release-assets/*.apk
           fail_on_unmatched_files: false
           draft: false
           prerelease: true
