@@ -370,3 +370,10 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
   - 加 quick-start 引导卡片（3 步傻瓜式）+ 内联 CSS + 16 条新中文翻译（关键字段说明 LOID/SN 去哪找）。
 - **验证**：7 JS node --check、2 JSON、PO 388 配平、Rust cargo test 3/3、远端 5 文件 md5 与本地一致。
 - configure.sh 本地已改（pon_userspace feed → likz0421 fork）但未推，v39(45911941564) 仍在 Build；待其验证通过后推 configure.sh 触发 v40 让固件真正用上 PON 增强。
+
+### 第 10 轮终：v40 直接触发（不浪费等 v39），PON feed 指向 fork（2026-11-27 08:16）
+用户问"直接编 v40 还是等 39"。决策：不取消 v39（已在 Build 中段，取消浪费；它先编完可先验证 bridge 修复），直接推 configure.sh 指向 PON fork 触发 v40（push 自动）。
+- configure.sh@316903a：pon_userspace feed → likz0421/openwrt-pon-userspace.git;main（含全部 PON 改造）。
+- v40(run 45915793955, event=push) 已触发；v39(run 45911941564) 并行在编。watch-both.js(rJsDEf) 同时监控。
+- v40 = v39 超集（bridge 修复 + vantage 主题 + PON 全套）。两者固件核心修复一致，v40 多 PON 插件增强。
+- 待编完：解包二进制验证（bridge 修复/vantage 在 argon 无/PON 前端 bundle md5/ponctl version 命令），再给用户最终刷机版。
