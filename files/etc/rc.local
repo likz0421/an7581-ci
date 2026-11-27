@@ -28,6 +28,8 @@ if [ ! -f "$MARK" ]; then
 	uci -q set dhcp.lan.start='2'
 	uci -q set dhcp.lan.limit='253'
 	uci -q set dhcp.lan.leasetime='36h'
+	# dnsmasq 必须显式打开 sequential_ip 才真正按顺序分配（默认按 MAC hash）
+	uci -q set dhcp.lan.sequential_ip='1'
 	changed=1
 
 	# ---- WiFi：所有射频 SSID=hanzi / WPA2 密码 hanziwawa ----

@@ -384,3 +384,33 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - 我们 configure.sh：`src-git honk https://github.com/kenzok8/openwrt-honk.git`（默认 main，动态跟随），无需 pin。
 - 实测固件 honk-core 二进制：v31 含 beta.6、v37 含 beta.7 → **用户当前 v37 已是 beta7**；v39/v40 拉 feeds 时间(11-26 23:39 / 11-27 00:20 UTC)晚于 beta7 打包(11-26 09:39 UTC)，也是 beta7。
 - 结论：无需改动、无需为 honk 重编。保持动态 main 即可自动跟上游。
+
+### 第 11 轮终：v39 + v40 编译完成 + 二进制验证，v40 定为最终刷机版（2026-11-27）
+- v39(run 45911941564) completed/success，Release v39；verify-v39-fw.py 17/17：vantage 78 文件/argon 0；桥接修复编入证据链（e9faf27 23:32Z 推送、run 23:36Z 启动、fttrd md5 f09beca2≠v37 17c113f0，注意 /sys/class/net/ 字符串在 v37 已有 7 处不能作标记）；驱动 cmp#2 保持；三个前端 bundle md5 与 v37 相同。
+  - 唯一初判 FAIL："默认主题 mediaurlbase=bootstrap" → 实为种子值，30_luci-theme-vantage 首启检测 themes.Vantage 新条目时自动切 vantage（PKG_UPGRADE!=1 且 new=1），hanzi 脚本不碰主题。
+- v40(run 45915793955) completed/success，Release v40（sysupgrade 36.1MB + recovery 30MB）；verify-v40-fw.py **35/35 全通过**：
+  - PON 六页面去注释归一化后与源码逐字节一致（镜像只去注释空行）；在线更新真在线（releases/latest → wget → sha256sum → apk add + UCI 可配源 + 本地兜底）；导入导出/仪表盘/单页配置全在；ponctl 395675B 含 status --all --json 与 version --json；pon.zh-cn.lmo/menu/ACL 在；v39 成果无回退。
+- 文档：README 改推荐 v40，FTTR 段修正为驱动层 2 口（旧 16 口说明已过时）。
+- **交付结论：v40 为最终刷机版**，全部前后端改造已编入并经二进制验证；真机运行仍待用户实测。
+
+### 第 12 轮：PON/FTTR 改进调研 + v41 前端增强（2026-11-27）
+用户问"pon 和 fttr 前后端还有值得改进的吗，结合市面开源项目"，授权自行安排。
+- **调研**：landvd/OLT-Manager（未注册 ONU 自动发现、光衰健康梯度、配置脚本预览+人工确认、100% 只读探查红线）、Sirherobrine23/zh-volt（Rust+LuCI、最近 100 条异步通知+last offline reason、命令目录+confirm:true）、hack-gpon（ONT 逆向百科）、bartekkois/GPONMonitor。
+- **判断**：核心缺口是"时间维度"——现状全是瞬时快照，掉线/弱光劣化不可追溯。划清边界：我们是单 OLT 2 口家用 FTTR 主猫，机房级 SNMP/Telnet 采集不适用；FTTR 拓扑已消费 clients/assoc/光功率且是 1.1MB 打包 bundle（含 echarts），本轮不动。
+- **决策：纯前端实现**（不动后端 Rust/驱动，风险最低）：
+  - status.js：powerHistory/eventLog 内存环形缓冲（TREND_LIMIT=40≈2 分钟、EVENT_LIMIT=30，不写 flash）；SVG polyline sparkline；WEAK_RX_DBM=-27 弱光标红+徽标；生命周期状态变化事件时间线；poll 回调记录趋势+事件。
+  - backup.js：configDiff() 按 section+key 比对 option/list，import/restore 前 window.confirm 展示"将改变哪些项"（最多 20 条+省略计数），用户确认才执行；保留原自动备份。
+  - pon.po：+16 条中文词条。
+- **本地验证**：6 JS node --check 全过；po 403/403 配平（3 个重复 msgid 是上游原有）；隔离自测 configDiff（change/add/相同配置 0 差异）、renderTrend（SVG/阈值/空数据/异常数据跳过）全 PASS。
+- **审查修正**：发现 appendTo 与 E() 传 null 子元素是现有代码无先例的 API 用法，改成 wrap.appendChild 与条件 push；重新 node --check + 推送。
+- **推送时序**：首推 ca46c2f（03:03）、修正 cada1eef（03:04:50）；v41 run 45931925879 于 03:03:36 启动，修正推送时仍在"恢复缓存"步骤、feeds 拉取未开始，fork HEAD=cada1eef 确认为修正版，编译会拉到最新。
+- v41 verify-v41-fw.py 已备好（趋势/弱光/事件/diff/中文/v40 不回退），待编译完成后运行。
+
+### 第 12 轮终：v41 编译成功 + 二进制验证 35/35（2026-11-27）
+- v41(run 45931925879) completed/success，Release v41（sysupgrade 36.1MB + recovery 30MB）。
+- verify-v41-fw.py **35/35 全通过**：
+  - 新功能：趋势缓冲/splice 限长/SVG polyline/-27dBm 弱光/pon-weak 徽标/eventLog 时间线/poll 记录×3×2/不落盘；configDiff/confirmImport/import+restore 双确认/add-remove-change/备份保留；6 条中文 lmo 齐全。
+  - 不回退：status.js+backup.js 与 v40 不同（确认更新），PON 其余 4 页面/ponctl/vantage 78 文件/argon 0/fttrd/fmcs.ko/FTTR 三 bundle 与 v40 全一致。
+- **修正版时序验证**（关键）：额外确认镜像内 status.js 无 appendTo、含 titleChildren 条件 push、无 E(...:null)、归一化 md5 == 本地修正版 cada1eef — 编译拉到的是修正版而非首推 ca46c2f，两个 API 风险点均不在固件里。
+- README 更新：新增"PON 状态页增强（v41 起）"章节，推荐固件改 v41，v40 明细折叠保留。
+- **交付结论：v41 为最终刷机版**，纯前端增强已编入并验证；真机运行仍待用户实测。

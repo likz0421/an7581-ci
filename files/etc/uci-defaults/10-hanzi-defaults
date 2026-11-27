@@ -10,6 +10,8 @@ uci -q set network.lan.netmask='255.255.255.0'
 uci -q set dhcp.lan.start='2'
 uci -q set dhcp.lan.limit='253'
 uci -q set dhcp.lan.leasetime='36h'
+# dnsmasq: assign IPs sequentially (.2, .3, ...) instead of by MAC hash
+uci -q set dhcp.lan.sequential_ip='1'
 uci commit network 2>/dev/null
 uci commit dhcp 2>/dev/null
 

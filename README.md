@@ -23,18 +23,47 @@ H3C HM2004-DU（Airoha AN7581）PonWrt 自动编译，只看需要的这几样�
 
 改默认值：编辑 [files/](files/) 下对应脚本，push 后重编。
 
-## FTTR 接口数量自定义（H3C HM2004-DU）
+## FTTR 接口数量（H3C HM2004-DU）
 
-固件默认把 16 个 fttr 下行口（fttr1~fttr16）全部桥进 br-lan。现在可以自定义只保留其中 N 个：
+**v37 起固件在驱动层只创建 2 个 fttr 下行口（fttr1、fttr2）**——不是前端隐藏，是 kmod 真实注册数量，
+`FMCS_ACTIVE_FTTR_PORTS=2`（结构体数组容量仍为 16 以支持硬件编号）。后端桥接与前端拓扑图都只认这 2 个口，
+后端 `switch_ports` 为单一真相源，前端不再自行猜测端口数。
 
-- **网页改**：FTTR → 配置 → 基本 → **FTTR LAN port count**（1~16），保存后点 **Restart** 重启 fttrd 生效。
-- **命令行改**：`uci set fttr.h3c.lan_ports=4 && uci commit fttr && /etc/init.d/fttr restart`
-- 设置为 N 后，只有 `fttr1`~`fttrN` 留在 br-lan，其余口从桥里移除并 down。
-- 不配置或设为 16 = 使用全部端口（原厂行为）。
+- **网页改**：FTTR → 配置 → 基本 → **下联端口数量**（1~2），保存后点 **Restart** 重启 fttrd 生效。
+- **命令行改**：`uci set fttr.h3c.lan_ports=2 && uci commit fttr && /etc/init.d/fttr restart`
+- 早期版本曾支持 1~16 的 `lan_ports` 配置，但驱动层已收窄，超过 2 的值会被拒绝。
 
 > 该能力来自后端 fork [likz0421/openwrt-fttr `an7581-custom` 分支](https://github.com/likz0421/openwrt-fttr)
 > 与前端 [likz0421/luci-app-fttr](https://github.com/likz0421/luci-app-fttr) package 分支，
 > `configure.sh` 已把 fttr feed 指向该分支。
+
+## PON 状态页增强（v41 起）
+
+- **光功率趋势**：每张 PON 线路卡片显示最近约 2 分钟的接收光功率曲线（SVG sparkline），数据只存浏览器内存，不写 flash。
+- **弱光告警**：接收光功率低于 -27 dBm 时卡片和曲线标红并显示"光信号偏弱"徽标。
+- **链路事件时间线**：页面打开期间生命周期状态变化（如掉线/重连）按时间倒序列出，最近 30 条。
+- **导入/恢复 diff 确认**：导入配置或恢复备份前先弹出"将改变哪些项"的清单，人工确认后才执行，且始终先备份当前配置。
+
+> 这些是纯前端改进，不涉及后端/驱动；趋势与事件是页面生命周期内的观察数据，刷新页面后重新累积。
+
+## 当前推荐固件：v41
+
+[Release v41](https://github.com/likz0421/an7581-ci/releases/tag/v41) = v40 + 上述 PON 状态页增强，二进制验证 35/35 通过：
+
+- 下载 `...-squashfs-sysupgrade.itb`（36.1MB）sysupgrade 即可；已刷 v40 的可保留配置升级。
+- v40 的全部内容（FTTR 驱动级 2 口 + 桥接修复 + 中文 SVG 拓扑 + Vantage 主题 + PON 全套改造 + honk beta7）均在 v41 中且未回退。
+
+<details><summary>v40 变更明细（历史）</summary>
+
+[Release v40](https://github.com/likz0421/an7581-ci/releases/tag/v40) = 当时全部修复的超集，二进制验证 35/35 通过：
+
+- **FTTR**：驱动层 2 口 + 桥接修复（fttrd 不再对不存在的 fttr3~16 做 `ip link`，避免 `Object not found`/硬件初始化失败）+ 全中文界面 + SVG 分层拓扑图（无 G6）。
+- **主题**：移除 argon，默认 `luci-theme-vantage`（首启自动切换）。
+- **PON 插件**：状态仪表盘 + 单页傻瓜式配置 + 一键导入导出 + **真在线更新**（GitHub releases → wget → sha256 → apk add，更新源可经 `pon.update.release_url` 改）+ ponctl `status --all --json` / `version --json`。
+- **honk**：beta.7 已含。
+- 刷机：已刷 PonWrt 直接 sysupgrade；首次刷先备份 factory（PON 校准/身份）。保留配置升级不会覆盖你改过的 IP/WiFi。
+
+</details>
 
 ## 构建守卫（发版前自动检查，避免"构建成功但固件缺东西"）
 
@@ -57,7 +86,7 @@ PPE 流表依赖的 `CONFIG_DEBUG_FS=y` 已在通用内核配置里；Frame Engi
 
 ## 用法
 
-1. **下载固件**：[Actions](https://github.com/likz0421/an7581-ci/actions) 下载 `an7581-run-<N>` 工件
+1. **下载固件**：优先用 [Release v40](https://github.com/likz0421/an7581-ci/releases/tag/v40) 的 `...-squashfs-sysupgrade.itb`；历史构建在 [Actions](https://github.com/likz0421/an7581-ci/actions)
 2. **刷机**：先备份 factory 分区（PON 校准/身份）；首次用 [an758x-stock2ubi](https://github.com/pbs05/an758x-stock2ubi)；已刷 PonWrt 直接 sysupgrade
 3. **改包**：编辑 [.config.additions](.config.additions) / [.config.fttr](.config.fttr) 后 push 自动重编
 4. **手动触发**：Actions → Run workflow（`ponwrt_ref` / `with_fttr` / `pon_userspace_pr16`）

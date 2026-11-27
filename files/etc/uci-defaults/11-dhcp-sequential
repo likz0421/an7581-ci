@@ -1,0 +1,12 @@
+#!/bin/sh
+# One-time migration: enable dnsmasq sequential IP assignment.
+# New file name guarantees it runs once on sysupgrade from any older version,
+# even when the hanzi-defaults marker already exists (preserve-config upgrade).
+. /lib/functions.sh
+
+if [ -z "$(uci -q get dhcp.lan.sequential_ip)" ]; then
+	uci -q set dhcp.lan.sequential_ip='1'
+	uci commit dhcp 2>/dev/null
+fi
+
+exit 0
