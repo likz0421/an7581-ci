@@ -52,8 +52,10 @@ if [ "$WITH_FTTR" = "true" ]; then
 fi
 if [ "$PR16" = "true" ]; then
   # feeds.conf syntax: <url>[;<ref>]  (branch refs use ';')
-  sed -i 's|^src-git pon_userspace .*|src-git pon_userspace https://github.com/DenzelVincent/openwrt-pon-userspace.git;main|' feeds.conf.default
-  echo "[feeds] pon_userspace -> DenzelVincent fork (PR#16 head)"
+  # Our fork adds: PON status dashboard, config backup/restore, online updater,
+  # and ponctl `status --all --json` / `version --json` (cargo-tested).
+  sed -i 's|^src-git pon_userspace .*|src-git pon_userspace https://github.com/likz0421/openwrt-pon-userspace.git;main|' feeds.conf.default
+  echo "[feeds] pon_userspace -> likz0421 fork (enhanced PON UI + ponctl JSON)"
 fi
 echo "[feeds] feeds.conf.default:"
 grep -E '^(src-git|src-link)' feeds.conf.default || true
