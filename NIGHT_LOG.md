@@ -414,3 +414,66 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - **修正版时序验证**（关键）：额外确认镜像内 status.js 无 appendTo、含 titleChildren 条件 push、无 E(...:null)、归一化 md5 == 本地修正版 cada1eef — 编译拉到的是修正版而非首推 ca46c2f，两个 API 风险点均不在固件里。
 - README 更新：新增"PON 状态页增强（v41 起）"章节，推荐固件改 v41，v40 明细折叠保留。
 - **交付结论：v41 为最终刷机版**，纯前端增强已编入并验证；真机运行仍待用户实测。
+
+### 第 13 轮：用户报 FTTR Object not found + PON 英文 tab + dnsmasq 顺序分配（2026-11-27 中午）
+用户反馈：fttr/get_status Object not found 又出现；PON 更新/配置导入 tab 是英文；dnsmasq 没按顺序分配 IP；要求前后端都修+仔细检查。
+- **FTTR 深度静态排查**（拉 fork e9faf27 最新源码）：
+  - ubus 注册（runtime.rs 160-200）独立于硬件初始化，create_methods 正常；get_status 通过 hardware_ready 标志工作（213/430 行），硬件未 ready 也能返回状态——前提是**进程活着**。
+  - 硬件初始化失败分支（628-634）执行 `process::exit(1)` → 整个进程退出 → ubus 对象消失 → Object not found。这是根因链条。
+  - 已排除：bridge 路径（H3C 平台 305/524 行均用 setup_bridge_limited，1239 行是 fiberhome 平台不走）、clear_offline_hardware（activation.rs 操作 FPGA 寄存器非 netdev，16 个逻辑 ONU 本就存在）、interface_present 守卫（network.rs 已正确）。
+  - 结论：需真机日志确认是"启动失败退出"还是"运行中崩溃"及具体 error；未获日志前不改后端核心逻辑（避免盲改引入 bug）。
+- **PON 英文 tab 根因**：菜单 JSON 的 title 是硬编码英文（`Backup / Restore`、`Online update` 等），po 缺对应 msgid → 补 2 条菜单 + 4 条页面文案（Package / PON package installed / Not configured / Optical signal）+ 总览 5 条，po 412→414 配平，重复仅上游原有 3 条。
+- **PON 高级定制**：status.js 加"线路健康总览"横幅（renderOverview：线路总数/在线/弱信号/错误/最低接收光功率，5 个统计卡，颜色分级），接入 render+poll；自测统计正确（3 线路/2 在线/1 弱光/1 错误/-28.0dBm）。
+- **dnsmasq 顺序分配根因**：出厂默认只有 start/limit/leasetime，**缺 `sequential_ip=1`**（dnsmasq 默认按 MAC hash 分配）。核实 /etc/init.d/dnsmasq 支持 `--dhcp-sequential-ip`。修复三处：10-hanzi-defaults、rc.local 兜底、新增 11-dhcp-sequential（新文件名保证保留配置升级也执行一次）。
+- **本地验证**：7 JS node --check 全过；3 shell 脚本 sh -n 全过；po 414/414 配平；renderOverview/configDiff/renderTrend 隔离自测全 PASS。
+- **推送**：PON fork 6f41f6a；an7581-ci 3c63a696（files/ 不在 workflow push paths，手动 dispatch 触发 v42 run 45941498971）。
+- v42 verify-v42-fw.py 已备好，待编译验证。
+
+### 第 14 轮：真机日志锁定 FTTR ENODEV 根因 + v44 后端加固（2026-11-27 下午）
+用户二次日志：
+- `ps` 无 fttrd；`ubus list` 无 fttr 对象；但 `fttrd --platform-info` 完全正常（selection_ready=true, compiled=true, verified, runtime, selection_error=null）→ 推翻"platform-check 竞态"假设，fttr.init 的等待重试非关键。
+- 精确日志（重启后抓取）关键行：
+  `[+] Registered native ubus object 'fttr'` → `[+] Stock discovery timing` → `[-] Hardware initialization failed; requesting supervised restart: No such device (os error 19)` → 进程 exit(1)，procd respawn 循环。
+- md5 确认用户设备 fttrd=f09beca2 = v39/v40/v41 桥接修复版，非 v37 旧版 → 桥接守卫未覆盖真正失败点。
+- **关键推理**：`No such device (os error 19)` 是 Rust std 系统调用的 ENODEV 格式；而 setup_bridge 的 link() 用 io::Error::other("ip link ...") 不会带 "(os error 19)" 后缀 → 失败不在桥接，而在 initialize_hardware 中 configure_discovery_timing 之后的 restore_optical_state（set_optical_tx_enable 访问光模块设备节点）或 clear_offline_hardware 的 bosa 操作。
+- **决策：不逐个猜哪行，做根本加固**（fork 4d36399）：
+  - runtime.rs 硬件初始化失败分支改为"进程内重试 3 次（间隔 2s，每次先 set_optical_tx_enable(false) 复位）"；全失败后**不 exit**，进入 degraded mode 保持 ubus 对象存活 → 前端 get_status 可用，彻底消除 Object not found。
+  - ubus 注册在独立线程，主循环靠 hardware_ready 标志工作，进程存活时 get_status 能返回降级状态——源码已验证此机制。
+- **本地验证**：拉完整 crate 到 /d/tmpcheck（英文路径），替换补丁后 cargo check；75 个错误全是 Windows 缺 Unix API（std::os::unix/libc::flock/UnixStream 等），无一条指向 runtime.rs 改动段 → 本地环境无法完整编译 Linux crate；CI（Linux）编译作为最终验证。
+- 待 v42/v43 编完后触发 v44 把 runtime.rs 补丁编入；verify-v44-fw.py 已备好（含补丁日志串验证）。
+
+### 第 14 轮续：版本收敛到 v44（2026-11-27 下午）
+- 用户要求关闭 v42/v43 直接编 v44。API 取消：v42 已完成（409，成功编译完）、v43 取消成功（202）。
+- v44(run 45947349965) workflow_dispatch 触发；fork HEAD 确认 fttr an7581-custom=4d36399（含 runtime.rs 加固）。
+- 提前下载 v42 固件验证前端部分（v44 子集）：dnsmasq 顺序分配 6/6、PON 中文 11/12（"硬件标识"FAIL 实为验证脚本期望值写错，实际翻译"硬件身份"正确，已修正验证脚本）、健康总览 5/5、翻译零遗漏 316 条、其他不回退全过。fttr.init 诊断与 fttrd 加固在 v42 中 FAIL 属预期（那些修复只在 v44）。
+- 待 v44 编译完成后运行 verify-v44-fw.py（重点第 6 段：fttrd 重试日志串 + degraded mode + ≠v41）。
+
+### 第 14 轮终：v44 编译成功 + 二进制验证 37/37（2026-11-27）
+- v44(run 45947349965) completed/success，Release v44（sysupgrade 36.1MB + recovery 30MB）。CI 的 Linux 编译通过 = runtime.rs 加固补丁的最权威验证（本地 Windows 因 Unix API 缺失无法完整编译）。
+- verify-v44-fw.py **37/37 全通过**：
+  - dnsmasq 顺序分配 6/6；PON 中文 12/12；健康总览 5/5；翻译零遗漏 316 条；fttr.init 诊断 2/2。
+  - **核心加固 4/4**：v44 fttrd 含 "Hardware init attempt"/"retrying in 2s"/"failed after"/"staying alive in degraded mode"；旧 "requesting supervised restart" 已移除；md5 9b004340875381ff ≠ v41 f09beca2e9dec9be。
+  - 对照铁证：v41 含旧 exit 串 True、v44 False；v44 含新重试串、v41 无。
+  - 其他不回退：vantage/argon/fmcs.ko/PON update+config/FTTR topology/ponctl 全过。
+- README 推荐固件改 v44，附完整修复清单。
+- **交付结论：v44 为最终刷机版**。fttrd 不再因硬件初始化失败 exit → ubus 对象常驻 → Object not found 根治（即使硬件降级，前端也能读到状态）。真机运行待用户刷机实测。
+
+### 第 15 轮：真机多问题反馈（v44 仍异常）→ v45 修复（2026-11-27 傍晚）
+用户反馈：FTTR hardware initialization incomplete/控制器无数据；PON 还是上游前端感观；在线更新 Unexpected end of JSON input；导出配置"第 1 行格式错误"。
+- **PON 导出 bug（确凿，我引入）**：validateConfig 正则不认 `uci export` 输出的 `package 'pon'` 首行 → 第 1 行格式错误，导出/导入全废。修复：允许 package 行。自测真实 UCI export 格式 PASS、注释/空行 PASS、恶意文件仍拒绝。
+- **PON 在线更新 bug**：JSON.parse(wget 输出) 无保护，网络失败/非 JSON 时抛 "Unexpected end of JSON input"。修复：busybox timeout 20s 防卡死 + 空响应检测 + try-catch 友好中文提示。
+- **推送遗漏教训**：push-pon-v41.js 的 MAP 不含 update.js，第一次推送漏了它 → 单独 push-pon-update.js 推送。以后推送前必须核对文件清单。
+- **PON 前端"还是上游"**：镜像 md5 确认是改造版（status 24909B/config 单页 Step 引导在）；判断可能是浏览器缓存或用户观感，暂未改代码，请用户强刷验证。
+- **FTTR 深挖（终于锁定路径）**：本地完整源码（/d/tmpcheck tarball）确认 `configure_discovery_timing` 打印后即返回，失败在其后。restore_optical_state 有三个 `?` 可报 ENODEV：`set_tx(false)` 前置静默、`prepare()`、末尾 `set_tx(true)`；`set_optical_tx_enable` 内部 `calibration::resolve()` → I2C/校准文件访问可能 ENODEV。
+- **v45 修复（fork e7e6c39）**：不再猜具体行——① restore_optical_state 三个失败点全部 best-effort（记录错误但继续，返回 degraded）；② prepare closure 每步加 `[init] step N/5` 日志；③ setup_bridge/clear_offline_hardware 失败改为警告不阻断。目标：硬件初始化走完、ubus 有数据、下次日志能精确定位剩余问题。
+- 本地 cargo check：无 runtime.rs 相关错误（Windows 缺 Unix API 的环境错误属正常）。
+- v45 run 45953xxx 触发；verify-v45-fw.py 已备好。
+
+### 第 16 轮：全插件翻译审计 + PON 前端"没生效"排查（2026-11-27 傍晚）
+用户反馈：FTTR hardware initialization incomplete/控制器无数据；PON 前端"还是上游"只看到在线更新和数据导入导出；多个插件我改的没翻译。
+- **翻译审计（终于做了全量）**：写 audit-i18n.py 提取镜像 8 个 lmo + 全部 view JS。lmo 是 gettext 变体（开头 nplurals header + 键值对），无标准 index，改为从源码 po 审计。
+- **FTTR 发现 115 条未翻译**（fork luci-app-fttr po 1068 条但缺这些）：拓扑页 16 条（FTTR topology/Port %s/Link/Speed/Interface/OLT controller/已注册 等——正是用户看到的英文）+ config 30 条 + calibration 30 条 + sync/npu/hl202/index/hardware/about 共 39 条。逐条专业翻译生成 gen-fttr-po.py（115 条全覆盖无遗漏），追加 po（1068→1183 配平），推 fork 8049f6e。
+- **PON 前端"没生效"排查**：v44 镜像内 config.js 有 Step 1/Step 2/quickstart、status.js 有 renderOverview/TREND_LIMIT/eventLog，确认是改造版；apk 清单路径正确；菜单 path 正确。**判断用户设备很可能刷的不是 v44**（此前用户确认 fttrd md5=f09bec 是 v41；config.js 从 v40 起就是单页版，若看到 tab 则是 v37/v39 或浏览器缓存）。已请用户确认版本。
+- **版本收敛**：v45 在编时又推了 FTTR 翻译，赶不上 feeds → 取消 v45、触发 v46（run 45971xxx），含全部改动：PON 导出/更新 bug 修复 + fttr runtime 加固 + FTTR 115 条翻译。
+- verify-v46-fw.py（前端/后端功能）+ verify-v46-i18n.py（翻译命中）已备好。
+- **教训固化**：以后每次改前端必须做"源码 JS 文案 vs po"全量 diff，并把真实 uci export 输出喂给 validateConfig 自测——之前只查文件在不在，漏了功能级验证。

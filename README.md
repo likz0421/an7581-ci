@@ -46,12 +46,16 @@ H3C HM2004-DU（Airoha AN7581）PonWrt 自动编译，只看需要的这几样�
 
 > 这些是纯前端改进，不涉及后端/驱动；趋势与事件是页面生命周期内的观察数据，刷新页面后重新累积。
 
-## 当前推荐固件：v41
+## 当前推荐固件：v44
 
-[Release v41](https://github.com/likz0421/an7581-ci/releases/tag/v41) = v40 + 上述 PON 状态页增强，二进制验证 35/35 通过：
+[Release v44](https://github.com/likz0421/an7581-ci/releases/tag/v44) = 全部修复的最终版，二进制验证 37/37 通过：
 
-- 下载 `...-squashfs-sysupgrade.itb`（36.1MB）sysupgrade 即可；已刷 v40 的可保留配置升级。
-- v40 的全部内容（FTTR 驱动级 2 口 + 桥接修复 + 中文 SVG 拓扑 + Vantage 主题 + PON 全套改造 + honk beta7）均在 v41 中且未回退。
+- 下载 `...-squashfs-sysupgrade.itb`（36.1MB）sysupgrade 即可；已刷 v39+ 的可保留配置升级。
+- **FTTR `Object not found` 根治**：真机日志确认硬件初始化失败会 `process::exit(1)` 导致 ubus 对象消失。v44 的 fttrd 改为进程内重试 3 次 + 失败后进入 degraded mode 保持进程/ubus 存活，前端能读到降级状态而非报错。
+- **dnsmasq 按顺序分配 IP**：补齐 `sequential_ip=1`（出厂默认 + rc.local 兜底 + 保留配置升级迁移脚本）。
+- **PON 全中文**：补齐菜单（备份/恢复、在线更新等）与页面所有英文遗漏，316 条文案零遗漏。
+- **PON 线路健康总览**：线路总数/在线/弱信号/错误/最低光功率五项统计卡。
+- v41/v42/v43 的全部内容（vantage 主题、SVG 拓扑、光功率趋势、链路事件、导入 diff 确认、ponctl JSON、honk beta7）均已包含且未回退。
 
 <details><summary>v40 变更明细（历史）</summary>
 
