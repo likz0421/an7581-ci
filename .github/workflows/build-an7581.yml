@@ -223,5 +223,8 @@ jobs:
           files: |
             ponwrt/bin/targets/airoha/an7581/**/*.itb
             ponwrt/bin/targets/airoha/an7581/**/*.bin
+            ponwrt/bin/targets/airoha/an7581/packages/luci-app-pon*.apk
+            ponwrt/bin/packages/*/luci-app-pon*.apk
+          fail_on_unmatched_files: false
           draft: false
           prerelease: true
