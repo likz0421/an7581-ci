@@ -359,3 +359,14 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - **清理**：移除 diagnostics.js 里重复的本地更新 section（修掉删除时多留的 `])` 语法错误）。
 - **验证**：7 个 JS node --check 通过、2 个 JSON 合法、PO 配平、远端 fork blob md5 与本地一致、cargo test 3/3。
 - **configure.sh 本地已改**（未推，避免污染 v39）：pon_userspace feed 指向 likz0421 fork。v39(run 45911941564) 仍在 Build，待其验证通过后推送并触发 v40。
+
+### 第 10 轮再续：PON 配置页改单页分组 + 借鉴项目调研（2026-11-27）
+用户质问：PON 到底改好没、美化/排版/傻瓜式/一键导入导出/在线更新？并指出"配置页很多 tab 不能一个页面配完，上游像半成品"。
+- **借鉴项目调研**（联网）：
+  - `Sirherobrine23/zh-volt`（OLT 管理面板，Rust+LuCI）：状态快照聚合、光功率/ONU DOM 展示、写操作强制 confirm、最近 100 条通知 → 对应我们的批量状态 JSON + 仪表盘 + 在线更新确认。
+  - `juanmreyesa/ma5671a-openwrt`（GPON SFP stick clean-room OMCI + LuCI）、`LazuliKao/openwrt-fttr`（FTTR 上游）、`pbs05/openwrt-pon-userspace`（PON 上游，半成品）。
+- **配置页改造**（fork@bf064cd）：config.js 把 OMCI 的 3 tab（authentication/identity/compatibility）+ OAM 的 2 tab 全部去掉，改成平铺分组 TypedSection：
+  - Step 1 线路模式（始终显示）、Step 2 注册与身份 XG-PON（filter 非 epon）、Step 2 注册与身份 EPON（filter epon）；所有字段直接 s.option()，一页滚动配完、底部统一 Save & Apply。
+  - 加 quick-start 引导卡片（3 步傻瓜式）+ 内联 CSS + 16 条新中文翻译（关键字段说明 LOID/SN 去哪找）。
+- **验证**：7 JS node --check、2 JSON、PO 388 配平、Rust cargo test 3/3、远端 5 文件 md5 与本地一致。
+- configure.sh 本地已改（pon_userspace feed → likz0421 fork）但未推，v39(45911941564) 仍在 Build；待其验证通过后推 configure.sh 触发 v40 让固件真正用上 PON 增强。
