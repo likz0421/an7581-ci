@@ -377,3 +377,10 @@ PonWrt master（AN7581，内核 6.18）+ 以下插件，Passwall 全家桶关闭
 - v40(run 45915793955, event=push) 已触发；v39(run 45911941564) 并行在编。watch-both.js(rJsDEf) 同时监控。
 - v40 = v39 超集（bridge 修复 + vantage 主题 + PON 全套）。两者固件核心修复一致，v40 多 PON 插件增强。
 - 待编完：解包二进制验证（bridge 修复/vantage 在 argon 无/PON 前端 bundle md5/ponctl version 命令），再给用户最终刷机版。
+
+### 附：honk beta7 核实（2026-11-27，用户提示"honk 更新到 beta7"）
+- 上游 `daeuniverse/honk` 最新 tag = v0.1.0-beta.7 (commit f7415d0ac505)。
+- kenzok8/openwrt-honk 打包仓库 honk/Makefile：`PKG_VERSION:=2026.11.26`、`CORE_COMMIT:=f7415d0a...`（正是 beta7）；main 分支 2bfaed12 已含此 pin。
+- 我们 configure.sh：`src-git honk https://github.com/kenzok8/openwrt-honk.git`（默认 main，动态跟随），无需 pin。
+- 实测固件 honk-core 二进制：v31 含 beta.6、v37 含 beta.7 → **用户当前 v37 已是 beta7**；v39/v40 拉 feeds 时间(11-26 23:39 / 11-27 00:20 UTC)晚于 beta7 打包(11-26 09:39 UTC)，也是 beta7。
+- 结论：无需改动、无需为 honk 重编。保持动态 main 即可自动跟上游。
