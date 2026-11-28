@@ -1,0 +1,88 @@
+# run 54 build rc=0
+## bin/targets/airoha/an7581
+ponwrt/bin/targets/airoha/an7581:
+total 69140
+drwxr-xr-x 3 runner runner     4096 Nov 28 02:54 .
+drwxr-xr-x 3 runner runner     4096 Nov 28 01:32 ..
+-rw-r--r-- 1 runner runner     5171 Nov 28 01:45 config.buildinfo
+-rw-r--r-- 1 runner runner      716 Nov 28 01:45 feeds.buildinfo
+drwxr-xr-x 2 runner runner    12288 Nov 28 02:54 packages
+-rw-r--r-- 1 runner runner 32112640 Nov 28 02:54 ponwrt-airoha-an7581-h3c_hm2004-du-initramfs-recovery.itb
+-rw-r--r-- 1 runner runner 38629632 Nov 28 02:54 ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb
+-rw-r--r-- 1 runner runner     6134 Nov 28 02:54 ponwrt-airoha-an7581.manifest
+-rw-r--r-- 1 runner runner     1893 Nov 28 02:54 profiles.json
+-rw-r--r-- 1 runner runner      674 Nov 28 02:54 sha256sums
+-rw-r--r-- 1 runner runner       11 Nov 28 01:45 version.buildinfo
+
+ponwrt/bin/targets/airoha/an7581/packages:
+total 4792
+drwxr-xr-x 2 runner runner  12288 Nov 28 02:54 .
+drwxr-xr-x 3 runner runner   4096 Nov 28 02:54 ..
+-rw-r--r-- 1 runner runner   1966 Nov 28 01:49 autocore-42.apk
+-rw-r--r-- 1 runner runner  66658 Nov 28 02:33 base-files-1~f6977f2.apk
+-rw-r--r-- 1 runner runner  33240 Nov 28 02:30 block-mount-2026.10.18~907cf449-r1.apk
+-rw-r--r-- 1 runner runner 129160 Nov 28 01:47 dropbear-2026.94-r3.apk
+-rw-r--r-- 1 runner runner   2780 Nov 28 02:36 fitblk-2.apk
+-rw-r--r-- 1 runner runner  21472 Nov 28 02:30 fstools-2026.10.18~907cf449-r1.apk
+-rw-r--r-- 1 runner runner   4690 Nov 28 01:49 fwtool-2025.10.03~04cd252e-r1.apk
+-rw-r--r-- 1 runner runner 843126 Nov 28 01:50 h3c-fmcs-firmware-1.0-r1.apk
+-rw-r--r-- 1 runner runner   4802 Nov 28 02:54 index.json
+-rw-r--r-- 1 runner runner   3273 Nov 28 02:29 kernel-6.18.60~f2cf84cd4171a7c824bde8708305fcaa-r1.apk
+-rw-r--r-- 1 runner runner  20094 Nov 28 01:46 kmod-airoha-en7572-6.18.60-r13.apk
+-rw-r--r-- 1 runner runner   6281 Nov 28 01:46 kmod-airoha-paged-bosa-6.18.60-r13.apk
+-rw-r--r-- 1 runner runner   3330 Nov 28 01:46 kmod-airoha-pon-frontend-6.18.60-r13.apk
+-rw-r--r-- 1 runner runner  42195 Nov 28 02:04 kmod-airoha-xpon-6.18.60-r70.apk
+-rw-r--r-- 1 runner runner 217158 Nov 28 02:35 kmod-cfg80211-6.18.60.7.2-r12.apk
+-rw-r--r-- 1 runner runner    976 Nov 28 02:29 kmod-crypto-aead-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    948 Nov 28 02:29 kmod-crypto-ccm-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   5755 Nov 28 02:29 kmod-crypto-chacha20poly1305-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   3011 Nov 28 02:29 kmod-crypto-cmac-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    982 Nov 28 02:29 kmod-crypto-crc32c-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    939 Nov 28 02:29 kmod-crypto-ctr-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    945 Nov 28 02:29 kmod-crypto-gcm-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   2556 Nov 28 02:29 kmod-crypto-geniv-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    927 Nov 28 02:29 kmod-crypto-gf128-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    943 Nov 28 02:29 kmod-crypto-ghash-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    953 Nov 28 02:29 kmod-crypto-hash-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   4995 Nov 28 02:29 kmod-crypto-hmac-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    788 Nov 28 02:29 kmod-crypto-kpp-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   4349 Nov 28 02:29 kmod-crypto-lib-chacha20-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   4265 Nov 28 02:29 kmod-crypto-lib-chacha20poly1305-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  19211 Nov 28 02:29 kmod-crypto-lib-curve25519-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   4507 Nov 28 02:29 kmod-crypto-lib-poly1305-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    990 Nov 28 02:29 kmod-crypto-manager-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    913 Nov 28 02:29 kmod-crypto-null-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  10138 Nov 28 02:29 kmod-crypto-rng-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   2642 Nov 28 02:29 kmod-crypto-seqiv-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   2710 Nov 28 02:29 kmod-crypto-sha1-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   3321 Nov 28 02:29 kmod-crypto-sha3-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  10855 Nov 28 02:29 kmod-crypto-sha512-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  43487 Nov 28 02:29 kmod-fs-exfat-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   1032 Nov 28 02:29 kmod-fs-ext4-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  47001 Nov 28 02:29 kmod-fs-vfat-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   6910 Nov 28 01:45 kmod-gpio-button-hotplug-6.18.60-r7.apk
+-rw-r--r-- 1 runner runner  21122 Nov 28 02:30 kmod-h3c-fmcs-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   9228 Nov 28 02:29 kmod-hwmon-core-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    912 Nov 28 02:29 kmod-i2c-core-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  13773 Nov 28 02:29 kmod-inet-diag-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   4110 Nov 28 02:29 kmod-leds-gpio-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    915 Nov 28 02:29 kmod-lib-crc-ccitt-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    964 Nov 28 02:29 kmod-lib-crc16-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner    951 Nov 28 02:29 kmod-libphy-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner 401175 Nov 28 02:35 kmod-mac80211-6.18.60.7.2-r12.apk
+-rw-r--r-- 1 runner runner  11632 Nov 28 02:29 kmod-macvlan-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   4541 Nov 28 02:29 kmod-mppe-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  31199 Nov 28 02:37 kmod-mt76-connac-6.18.60.2026.10.28~0936617d-r2.apk
+-rw-r--r-- 1 runner runner  48286 Nov 28 02:37 kmod-mt76-core-6.18.60.2026.10.28~0936617d-r2.apk
+-rw-r--r-- 1 runner runner  75110 Nov 28 02:37 kmod-mt7915e-6.18.60.2026.10.28~0936617d-r2.apk
+-rw-r--r-- 1 runner runner 714424 Nov 28 02:37 kmod-mt7916-firmware-6.18.60.2026.10.28~0936617d-r2.apk
+-rw-r--r-- 1 runner runner   3346 Nov 28 02:29 kmod-netlink-diag-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  57645 Nov 28 02:29 kmod-nf-conntrack-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner   5380 Nov 28 02:29 kmod-nf-conntrack-bridge-6.18.60-r1.apk
+-rw-r--r-- 1 runner runner  18135 Nov 28 02:29 kmod-nf-conntrack-netlink-6.18.60-r1.apk
+## relevant ipks (find)
+## ipk count
+0
+## itb
+ponwrt/bin/targets/airoha/an7581/ponwrt-airoha-an7581-h3c_hm2004-du-initramfs-recovery.itb
+ponwrt/bin/targets/airoha/an7581/ponwrt-airoha-an7581-h3c_hm2004-du-squashfs-sysupgrade.itb
