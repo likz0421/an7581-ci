@@ -1,0 +1,125 @@
+# Fast path: build ONLY the luci-app-pon apk for in-place online updates.
+# The PON package is pure files (JS/po/json) - no C/Rust compilation needed.
+# Reuses the main build's cached toolchain so this finishes in minutes,
+# NOT the ~1h full firmware build.
+name: build-pon-apk
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'Optional note (e.g. which frontend fix)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build-pon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+            g++-multilib git gnutls-dev gperf help2man intltool libelf-dev libglib2.0-dev libgmp-dev \
+            libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev \
+            libtool libyaml-dev libz-dev lld llvm ninja-build patch pkgconf python3 python3-pip \
+            python3-ply python3-docutils python3-pyelftools re2c rsync scons squashfs-tools swig texinfo \
+            uglifyjs unzip wget xxd zlib1g-dev zstd
+
+      - name: Clone PonWrt
+        run: |
+          git clone --depth=1 https://github.com/pbs05/ponwrt.git ponwrt
+          cd ponwrt && git log -1 --oneline
+
+      - name: Restore toolchain cache (from main build)
+        id: buildcache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ponwrt/dl
+            ponwrt/staging_dir
+            ~/.ccache
+          key: an7581-cache-v1-${{ hashFiles('scripts/configure.sh', '.config.additions', '.config.fttr') }}-
+          restore-keys: an7581-cache-v1-
+
+      - name: Configure (feeds + defconfig)
+        run: |
+          set +e
+          CI_ROOT="$GITHUB_WORKSPACE" bash "$GITHUB_WORKSPACE/scripts/configure.sh" master true true > /tmp/configure.log 2>&1
+          rc=$?
+          tail -n 60 /tmp/configure.log
+          [ $rc -ne 0 ] && exit $rc
+          exit 0
+
+      - name: Prepare toolchain (only if cache missed)
+        run: |
+          set +e
+          export CCACHE_DIR=~/.ccache
+          if [ ! -x ponwrt/staging_dir/host/bin/make ]; then
+            echo "cache miss: building tools/toolchain (this is the slow path)"
+            ( cd ponwrt && make -j"$(nproc)" tools/install toolchain/install ) > /tmp/toolchain.log 2>&1
+            rc=$?
+            tail -n 60 /tmp/toolchain.log
+            exit $rc
+          fi
+          echo "toolchain from cache - skipping"
+          # refresh host/toolchain stamps so make does not rebuild them
+          find ponwrt/staging_dir -type d -name stamp | grep -v '/target-' | while read d; do
+            find "$d" -type f -exec touch {} + 2>/dev/null || true
+          done
+
+      - name: Build luci-app-pon apk only
+        run: |
+          set +e
+          export CCACHE_DIR=~/.ccache
+          ( cd ponwrt || exit 1
+            d="package/feeds/pon_userspace/luci-app-pon"
+            [ -d "$d" ] || d=$(find package -type d -name luci-app-pon | head -1)
+            echo "=== package dir: $d ==="
+            [ -z "$d" ] && { echo "NO luci-app-pon package dir"; exit 3; }
+            echo "===== compile ====="
+            make -j1 V=s "$d/compile" || exit $?
+            echo "===== install ====="
+            make -j1 "$d/install" || exit $?
+          ) > /tmp/ponbuild.log 2>&1
+          rc=$?
+          echo "=== PON build rc=$rc ==="
+          grep -n -iE "error|failed|no such file" /tmp/ponbuild.log | tail -40 || true
+          tail -n 120 /tmp/ponbuild.log
+          exit $rc
+
+      - name: Collect apk
+        run: |
+          mkdir -p out
+          find ponwrt/bin -type f -name 'luci-app-pon*.apk' | tee /tmp/ponapk.txt
+          while read -r f; do cp "$f" out/; done < /tmp/ponapk.txt
+          ls -lh out/
+          [ -z "$(ls -A out/)" ] && { echo "NO APK PRODUCED"; exit 4; }
+
+      - name: Upload apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-pon-apk
+          path: out/
+          if-no-files-found: error
+
+      - name: Publish to pon-apk release tag
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pon-apk
+          name: PON plugin standalone apk
+          body: |
+            Standalone luci-app-pon apk for online in-place update.
+            Built independently of the full firmware - no sysupgrade needed.
+          files: out/*.apk
+          fail_on_unmatched_files: true
